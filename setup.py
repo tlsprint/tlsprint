@@ -1,3 +1,9 @@
 from setuptools import setup
 
-setup()
+setup(
+    entry_points={
+        'console_scripts': [
+            'tlsprint = tlsprint.cli:main',
+        ],
+    },
+)
