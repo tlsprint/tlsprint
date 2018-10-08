@@ -1,4 +1,6 @@
-def learn(directory):
+import os
+
+def learn_models(directory):
     """Learn the complete tree from all the different models.
 
     Args:

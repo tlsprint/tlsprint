@@ -1,4 +1,4 @@
 from tlsprint import learn
 
-def dummy_test():
+def test_dummy():
     pass

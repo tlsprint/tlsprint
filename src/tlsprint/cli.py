@@ -1,5 +1,7 @@
 import click
 
+from tlsprint.learn import learn_models
+
 
 @click.group()
 def main():
@@ -7,5 +9,6 @@ def main():
 
 
 @main.command()
-def learn():
-    print('bla')
+@click.argument('model_directory', type=click.Path(exists=True))
+def learn(model_directory):
+    click.echo('\n'.join(learn_models(model_directory)))
