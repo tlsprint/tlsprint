@@ -8,6 +8,9 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
+import networkx
+import pydot
+
 
 def _append_servers(tree, node, servers):
     try:
@@ -112,22 +115,46 @@ def learn_models(directory):
             is absent.
 
     Returns:
-        model_tree: A networkx tree containing the paths for all models.
+        tree: A networkx tree containing the paths for all models.
     """
     logger = logging.getLogger()
 
-    # Read and deduplicate the models
+    # Collect the names of the server directories
     server_dirs = [f.name for f in os.scandir(directory) if f.is_dir()]
+
+    # Merge duplicates toghether, by using the DOT model as dictionary key,
+    # and the server list as the value.
     models = defaultdict(list)
 
     for server in server_dirs:
+        # Not all directories actually contain a model. Skip this directory
+        # and log this event.
         try:
             model_root = Path(directory)
             with (model_root / server / 'learnedModel.dot').open() as f:
+                # This is where the deduplication happens
                 models[f.read()].append(server)
 
                 logger.info(f'Found model for: {server}')
         except OSError:
             logger.warning(f'Could not find model for: {server}')
 
-    return models
+    # Initialize an empty tree with a single node, all models will be merged
+    # into this tree.
+    tree = networkx.DiGraph()
+    root = tuple()
+    tree.add_node(root)
+
+    # For each model, convert to a networkx graph and merge into the tree
+    for model, servers in models.items():
+        # 'graph_from_dot_data()' returns a list, but StateLearner only puts a
+        # single graph in a file, we don't have to check the length.
+        pydot_graph = pydot.graph_from_dot_data(model)[0]
+
+        # Convert to networkx graph
+        graph = networkx.drawing.nx_pydot.from_pydot(pydot_graph)
+
+        # The start node is always 's0'
+        tree = _merge_graph(tree, root, graph, 's0', servers)
+
+    return tree
