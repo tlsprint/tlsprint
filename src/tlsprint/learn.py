@@ -8,7 +8,13 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
-import networkx
+
+def _append_servers(tree, node, servers):
+    try:
+        tree.nodes[node]['servers']
+    except KeyError:
+        tree.nodes[node]['servers'] = set()
+    tree.nodes[node]['servers'].update(servers)
 
 
 def _merge_graph(tree, root, graph, current_node, servers):
@@ -43,11 +49,7 @@ def _merge_graph(tree, root, graph, current_node, servers):
             tree.add_edge(sent_node, received_node, label=received)
 
             # Append the servers to the final node as attribute
-            try:
-                tree.nodes[received_node]['servers']
-            except KeyError:
-                tree.nodes[received_node]['servers'] = set()
-            tree.nodes[received_node]['servers'].update(servers)
+            _append_servers(tree, received_node, servers)
 
     # If not the base case, merge the current node into the tree and
     # recursively merge the rest
@@ -59,7 +61,7 @@ def _merge_graph(tree, root, graph, current_node, servers):
                 # Split the label in the sent and received message. Remove the
                 # double quotes and the excess whitespace.
                 sent, received = [
-                    x.replace('"', '').strip() for x in edge['label'].split('/')
+                    x.replace('"', '').strip() for x in edge['label'].split('/')  # noqa: E501
                 ]
 
                 # Append the sent and received messages to the tree
@@ -68,6 +70,17 @@ def _merge_graph(tree, root, graph, current_node, servers):
                 tree.add_edge(root, sent_node, label=sent)
                 tree.add_edge(sent_node, received_node, label=received)
 
+                # If the received message contains 'ConnectionClosed', or
+                # consists of a single dash ('-', which means time-out) this
+                # path can be stopped here. This greatly reduces the number
+                # of redundant nodes, because of 'ConnectionClosed' edges
+                # go the the final node, which always contains many self loops.
+                if 'ConnectionClosed' in received or '-' == received:
+                    # Append the servers
+                    _append_servers(tree, received_node, servers)
+
+                    # Do not recurse
+                    continue
 
                 # It can happen that a model contains a loop. In this case,
                 # append an additional node with the label 'LOOP' to the path,
@@ -77,17 +90,13 @@ def _merge_graph(tree, root, graph, current_node, servers):
                     tree.add_edge(received_node, loop_node, label='LOOP')
 
                     # Append the servers
-                    try:
-                        tree.nodes[loop_node]['servers']
-                    except KeyError:
-                        tree.nodes[loop_node]['servers'] = set()
-                    tree.nodes[loop_node]['servers'].update(servers)
+                    _append_servers(tree, loop_node, servers)
 
                     # Do not recurse
                     continue
 
                 # Recurse with new root and current node
-                tree = _merge_graph(tree, received_node, graph, neighbor, servers)
+                tree = _merge_graph(tree, received_node, graph, neighbor, servers)  # noqa: E501
 
     return tree
 
