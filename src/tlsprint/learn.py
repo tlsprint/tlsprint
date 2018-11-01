@@ -3,6 +3,50 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
+import networkx
+
+def merge_graph(tree, root, graph, current_node, servers):
+    """Merge a single model graph into the tree.
+
+    Args:
+        tree: The tree that is being constructed, and into which the graph will
+            be merged.
+        root: The current root node of the tree, the graph will be merged
+            beginning at this node.
+        graph: The graph to merge into the tree
+        current_node: The current node of the graph to merge
+        servers: The server implementations corresponding to this graph.
+    """
+    # Any node that has a self loop is a final node, this is the base case
+    # for the recursion.
+    if current_node in networkx.nodes_with_selfloops(graph):
+        for edge_number in graph[current_node][current_node]:
+            edge = graph[current_node][current_node][edge_number]
+
+            # Split the label in the sent and received message. Remove the
+            # double quotes and the excess whitespace.
+            sent, received = [
+                x.replace('"', '').strip() for x in edge['label'].split('/')
+            ]
+
+            # Append the sent and received messages to the tree
+            sent_node = root + (sent, )
+            received_node = root + (sent, received)
+            tree.add_edge(root, sent_node, label=sent)
+            tree.add_edge(sent_node, received_node, label=received)
+
+            # Append the servers to the final node as attribute
+            try:
+                tree.nodes[received_node]['servers']
+            except KeyError:
+                tree.nodes[received_node]['servers'] = set()
+            tree.nodes[received_node]['servers'].update(servers)
+    else:
+        pass
+
+    return tree
+
+
 def learn_models(directory):
     """Learn the complete tree from all the different models.
 
