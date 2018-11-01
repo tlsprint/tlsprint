@@ -1,3 +1,8 @@
+"""The learning component of tlsprint. The functions in this module can learn
+from the output of StateLearning and create a model of all TLS implementations
+in order to perform fingerprinting.
+"""
+
 import logging
 import os
 from collections import defaultdict
@@ -5,8 +10,10 @@ from pathlib import Path
 
 import networkx
 
-def merge_graph(tree, root, graph, current_node, servers):
-    """Merge a single model graph into the tree.
+
+def _merge_graph(tree, root, graph, current_node, servers):
+    """Merge a single model graph into the tree, used by `learn_models` to
+    create the tree of all merged models.
 
     Args:
         tree: The tree that is being constructed, and into which the graph will

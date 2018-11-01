@@ -1,6 +1,7 @@
 import networkx
 
-from tlsprint.learn import merge_graph
+from tlsprint.learn import _merge_graph
+
 
 def test_end_condition_simple():
     # Create tree with empty start node
@@ -15,7 +16,7 @@ def test_end_condition_simple():
 
     # Merge the graph into the tree
     servers = ['serverA', 'serverB']
-    tree = merge_graph(tree, tuple(), graph, 's2', servers)
+    tree = _merge_graph(tree, tuple(), graph, 's2', servers)
 
     # Assert that the tree is correct
     assert set(tree.nodes) == {
