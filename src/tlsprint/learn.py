@@ -24,9 +24,9 @@ def _merge_graph(tree, root, graph, current_node, servers):
         current_node: The current node of the graph to merge
         servers: The server implementations corresponding to this graph.
     """
-    # Any node that has a self loop is a final node, this is the base case
-    # for the recursion.
-    if current_node in networkx.nodes_with_selfloops(graph):
+    # Any node that has a itself as its only neighbor is a final node, this is
+    # the base case for the recursion.
+    if list(graph[current_node]) == [current_node]:
         for edge_number in graph[current_node][current_node]:
             edge = graph[current_node][current_node][edge_number]
 
@@ -48,8 +48,46 @@ def _merge_graph(tree, root, graph, current_node, servers):
             except KeyError:
                 tree.nodes[received_node]['servers'] = set()
             tree.nodes[received_node]['servers'].update(servers)
+
+    # If not the base case, merge the current node into the tree and
+    # recursively merge the rest
     else:
-        pass
+        for neighbor in graph[current_node]:
+            for edge_number in graph[current_node][neighbor]:
+                edge = graph[current_node][neighbor][edge_number]
+
+                # Split the label in the sent and received message. Remove the
+                # double quotes and the excess whitespace.
+                sent, received = [
+                    x.replace('"', '').strip() for x in edge['label'].split('/')
+                ]
+
+                # Append the sent and received messages to the tree
+                sent_node = root + (sent, )
+                received_node = root + (sent, received)
+                tree.add_edge(root, sent_node, label=sent)
+                tree.add_edge(sent_node, received_node, label=received)
+
+
+                # It can happen that a model contains a loop. In this case,
+                # append an additional node with the label 'LOOP' to the path,
+                # add the servers to this node and do not recurse.
+                if current_node == neighbor:
+                    loop_node = received_node + ('LOOP', )
+                    tree.add_edge(received_node, loop_node, label='LOOP')
+
+                    # Append the servers
+                    try:
+                        tree.nodes[loop_node]['servers']
+                    except KeyError:
+                        tree.nodes[loop_node]['servers'] = set()
+                    tree.nodes[loop_node]['servers'].update(servers)
+
+                    # Do not recurse
+                    continue
+
+                # Recurse with new root and current node
+                tree = _merge_graph(tree, received_node, graph, neighbor, servers)
 
     return tree
 
