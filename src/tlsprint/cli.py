@@ -1,6 +1,7 @@
 import click
 
 from tlsprint.learn import learn_models
+from tlsprint.misc import draw_model_tree
 
 
 @click.group()
@@ -10,8 +11,7 @@ def main():
 
 @main.command()
 @click.argument('model_directory', type=click.Path(exists=True))
-def learn(model_directory):
-    models = learn_models(model_directory)
-    print(f'Found {len(models)} unique implementations:')
-    implementations = [sorted(servers) for servers in models.values()]
-    print('\n\n'.join('\n'.join(servers) for servers in implementations))
+@click.argument('output')
+def learn(model_directory, output):
+    tree = learn_models(model_directory)
+    draw_model_tree(tree, output)
