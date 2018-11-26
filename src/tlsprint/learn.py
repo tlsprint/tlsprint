@@ -73,12 +73,11 @@ def _merge_graph(tree, root, graph, current_node, servers):
                 tree.add_edge(root, sent_node, label=sent)
                 tree.add_edge(sent_node, received_node, label=received)
 
-                # If the received message contains 'ConnectionClosed', or
-                # consists of a single dash ('-', which means time-out) this
+                # If the received message contains 'ConnectionClosed', this
                 # path can be stopped here. This greatly reduces the number
                 # of redundant nodes, because of 'ConnectionClosed' edges
                 # go the the final node, which always contains many self loops.
-                if 'ConnectionClosed' in received or '-' == received:
+                if 'ConnectionClosed' in received:
                     # Append the servers
                     _append_servers(tree, received_node, servers)
 
