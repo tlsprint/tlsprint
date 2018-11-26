@@ -9,6 +9,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import networkx
+from networkx.algorithms import simple_cycles
 import pydot
 
 
@@ -84,12 +85,15 @@ def _merge_graph(tree, root, graph, current_node, servers):
                     # Do not recurse
                     continue
 
-                # It can happen that a model contains a loop. In this case,
-                # append an additional node with the label 'LOOP' to the path,
-                # add the servers to this node and do not recurse.
-                if current_node == neighbor:
-                    loop_node = received_node + ('LOOP', )
-                    tree.add_edge(received_node, loop_node, label='LOOP')
+                # It can happen that a model contains a cycle, this is detected
+                # by checking if the current node is the final node in any of
+                # the values returned by `simple_cycles`. When a cycle is
+                # detected, append an additional node with the message that
+                # causes the cycle, and include 'CYCLE' in the edge label, and
+                # stop recursing.
+                if current_node in [cycle[-1] for cycle in simple_cycles(graph)]:  # noqa: E501
+                    loop_node = received_node + ('CYCLE', )
+                    tree.add_edge(received_node, loop_node, label='CYCLE')
 
                     # Append the servers
                     _append_servers(tree, loop_node, servers)
