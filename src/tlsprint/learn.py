@@ -144,7 +144,7 @@ def learn_models(directory):
 
     # Initialize an empty tree with a single node, all models will be merged
     # into this tree.
-    tree = networkx.DiGraph()
+    tree = ModelTree()
     root = tuple()
     tree.add_node(root)
 
@@ -161,3 +161,10 @@ def learn_models(directory):
         tree = _merge_graph(tree, root, graph, 's0', servers)
 
     return tree
+
+
+class ModelTree(networkx.DiGraph):
+
+    @property
+    def leaves(self):
+        return [node for node in self.nodes if self.out_degree(node) == 0]
