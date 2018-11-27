@@ -186,7 +186,33 @@ class ModelTree(networkx.DiGraph):
             group for leaf in self.leaves for group in self.nodes[leaf]['servers']  # noqa: E501
         }
 
-    def prune(self, groups):
+    def prune_node(self, node):
+        """Cut a node from the tree, pruning the predecessors away as far as
+        possible.
+        """
+        redundant_nodes = [node]
+
+        pruning = True
+        while pruning:
+            node = redundant_nodes[-1]
+            # It is a tree, to each node only has one predecessor at
+            # most.
+            try:
+                predecessor = list(self.predecessors(node))[0]
+            except IndexError:
+                break  # At the top of the tree
+
+            if self.out_degree(predecessor) == 1:
+                # Only connected to the lower redundant node
+                redundant_nodes.append(predecessor)
+            else:
+                pruning = False
+
+        # Remove the redundant nodes
+        for node in redundant_nodes:
+            self.remove_node(node)
+
+    def prune_groups(self, groups):
         """Prune the specified groups from the tree, removing redundant nodes
         from the tree."""
         groups = set(groups)
@@ -198,24 +224,14 @@ class ModelTree(networkx.DiGraph):
             # If the set is non empty, we can remove it and also their
             # predecessors if they are only connected to this leaf.
             if not self.nodes[leaf]['servers']:
-                redundant_nodes = [leaf]
+                self.prune_node(leaf)
 
-                pruning = True
-                while pruning:
-                    node = redundant_nodes[-1]
-                    # It is a tree, to each node only has one predecessor at
-                    # most.
-                    try:
-                        predecessor = list(self.predecessors(node))[0]
-                    except IndexError:
-                        break  # At the top of the tree
-
-                    if self.out_degree(predecessor) == 1:
-                        # Only connected to the lower redundant node
-                        redundant_nodes.append(predecessor)
-                    else:
-                        pruning = False
-
-                # Remove the redundant nodes
-                for node in redundant_nodes:
-                    self.remove_node(node)
+    def condense(self):
+        """Make the tree more compact by merging together nodes whose leaves
+        are all the same, and the leaves that contain 100% of the groups in the
+        model."""
+        # Remove leafs that contain 100% of the groups
+        groups = self.groups
+        for leaf in self.leaves:
+            if self.nodes[leaf]['servers'] == groups:
+                self.prune_node(leaf)
