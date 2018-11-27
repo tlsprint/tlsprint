@@ -125,7 +125,7 @@ def learn_models(directory):
     # Collect the names of the server directories
     server_dirs = [f.name for f in os.scandir(directory) if f.is_dir()]
 
-    # Merge duplicates toghether, by using the DOT model as dictionary key,
+    # Merge duplicates together, by using the DOT model as dictionary key,
     # and the server list as the value.
     models = defaultdict(list)
 
@@ -148,6 +148,17 @@ def learn_models(directory):
     root = tuple()
     tree.add_node(root)
 
+    # For identical models, store a group name instead of the list and create a
+    # mapping between the name and the implementations. This will reduce the
+    # size of the tree when drawn, and will no longer cause confusing as to
+    # which implementations have the same model. This mapping will be stored in
+    # the ModelTree
+    tree.model_mapping = {}
+    for i, (model, servers) in enumerate(models.items()):
+        name = 'model-{}'.format(i)
+        tree.model_mapping[name] = servers
+        models[model] = [name]
+
     # For each model, convert to a networkx graph and merge into the tree
     for model, servers in models.items():
         # 'graph_from_dot_data()' returns a list, but StateLearner only puts a
@@ -168,3 +179,9 @@ class ModelTree(networkx.DiGraph):
     @property
     def leaves(self):
         return [node for node in self.nodes if self.out_degree(node) == 0]
+
+    @property
+    def groups(self):
+        return {
+            group for leaf in self.leaves for group in self.nodes[leaf]['servers']
+        }
