@@ -91,18 +91,29 @@ def _merge_graph(tree, root, graph, current_node, servers):
                 # detected, append an additional node with the message that
                 # causes the cycle, and include 'CYCLE' in the edge label, and
                 # stop recursing.
-                if current_node in [cycle[-1] for cycle in simple_cycles(graph)]:  # noqa: E501
-                    loop_node = received_node + ('CYCLE', )
-                    tree.add_edge(received_node, loop_node, label='CYCLE')
+                found_loop = False
+                cycles = list(simple_cycles(graph))
+                for cycle in cycles:
+                    if current_node == cycle[-1]:
+                        loop_edge = graph[current_node][cycle[0]][0]
+                        sent, received = [
+                            x.replace('"', '').strip() for x in loop_edge['label'].split('/')  # noqa: E501
+                        ]
 
-                    # Append the servers
-                    _append_servers(tree, loop_node, servers)
+                        loop_cause_node = received_node + (sent, )
+                        loop_node = loop_cause_node + ('CYCLE', )
+                        tree.add_edge(received_node, loop_cause_node, label=sent)  # noqa: E501
+                        tree.add_edge(loop_cause_node, loop_node, label='CYCLE')
 
-                    # Do not recurse
-                    continue
+                        # Append the servers
+                        _append_servers(tree, loop_node, servers)
 
-                # Recurse with new root and current node
-                tree = _merge_graph(tree, received_node, graph, neighbor, servers)  # noqa: E501
+                        # Do not recurse
+                        found_loop = True
+
+                if not found_loop:
+                    # Recurse with new root and current node
+                    tree = _merge_graph(tree, received_node, graph, neighbor, servers)  # noqa: E501
 
     return tree
 
