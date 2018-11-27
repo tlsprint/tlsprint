@@ -183,5 +183,39 @@ class ModelTree(networkx.DiGraph):
     @property
     def groups(self):
         return {
-            group for leaf in self.leaves for group in self.nodes[leaf]['servers']
+            group for leaf in self.leaves for group in self.nodes[leaf]['servers']  # noqa: E501
         }
+
+    def prune(self, groups):
+        """Prune the specified groups from the tree, removing redundant nodes
+        from the tree."""
+        groups = set(groups)
+
+        for leaf in self.leaves:
+            # Start by removing the groups from every leaf node
+            self.nodes[leaf]['servers'] -= groups
+
+            # If the set is non empty, we can remove it and also their
+            # predecessors if they are only connected to this leaf.
+            if not self.nodes[leaf]['servers']:
+                redundant_nodes = [leaf]
+
+                pruning = True
+                while pruning:
+                    node = redundant_nodes[-1]
+                    # It is a tree, to each node only has one predecessor at
+                    # most.
+                    try:
+                        predecessor = list(self.predecessors(node))[0]
+                    except IndexError:
+                        break  # At the top of the tree
+
+                    if self.out_degree(predecessor) == 1:
+                        # Only connected to the lower redundant node
+                        redundant_nodes.append(predecessor)
+                    else:
+                        pruning = False
+
+                # Remove the redundant nodes
+                for node in redundant_nodes:
+                    self.remove_node(node)
