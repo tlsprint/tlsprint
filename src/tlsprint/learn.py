@@ -10,6 +10,7 @@ from pathlib import Path
 
 import networkx
 from networkx.algorithms import simple_cycles
+from networkx.algorithms.traversal.depth_first_search import dfs_tree
 import pydot
 
 
@@ -103,7 +104,7 @@ def _merge_graph(tree, root, graph, current_node, servers):
                         loop_cause_node = received_node + (sent, )
                         loop_node = loop_cause_node + ('CYCLE', )
                         tree.add_edge(received_node, loop_cause_node, label=sent)  # noqa: E501
-                        tree.add_edge(loop_cause_node, loop_node, label='CYCLE')
+                        tree.add_edge(loop_cause_node, loop_node, label='CYCLE')  # noqa: E501
 
                         # Append the servers
                         _append_servers(tree, loop_node, servers)
@@ -197,6 +198,11 @@ class ModelTree(networkx.DiGraph):
             group for leaf in self.leaves for group in self.nodes[leaf]['servers']  # noqa: E501
         }
 
+    def subtree(self, node):
+        """Return the subtree where `node` is the root, as a ModelTree."""
+        subtree_nodes = dfs_tree(self, node).nodes
+        return self.subgraph(subtree_nodes)
+
     def prune_node(self, node):
         """Cut a node from the tree, pruning the predecessors away as far as
         possible.
@@ -246,3 +252,27 @@ class ModelTree(networkx.DiGraph):
         for leaf in self.leaves:
             if self.nodes[leaf]['servers'] == groups:
                 self.prune_node(leaf)
+
+        # For each leaf, check if its parent contains other groups. If not,
+        # merge them together in one node.
+        changed = True
+        while changed:
+            changed = False
+
+            for leaf in self.leaves:
+                # Take the subtree of two predecessors up (because of the
+                # structure of the graph)
+                one_up = list(self.predecessors(leaf))[0]
+                two_up = list(self.predecessors(one_up))[0]
+
+                subtree = self.subtree(two_up)
+                groups = self.nodes[leaf]['servers']
+
+                if subtree.groups == groups:
+                    # List the servers at this root node in the original tree,
+                    # and remove the other nodes
+                    self.nodes[two_up]['servers'] = groups
+                    redundant_nodes = set(subtree.nodes) - {two_up}
+                    self.remove_nodes_from(redundant_nodes)
+                    changed = True
+                    break
