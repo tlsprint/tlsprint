@@ -276,3 +276,31 @@ class ModelTree(networkx.DiGraph):
                     self.remove_nodes_from(redundant_nodes)
                     changed = True
                     break
+
+    def draw(self, path):
+        """Draw this tree by outputting a Graphviz file in DOT format. This
+        slightly modifies the tree in order to improve the output:
+        -   Set the label of all non leafs nodes to blank, as the information
+            is already captured by the edges.
+        -   Set the label of all leaf nodes to the list of servers, including
+            the percentage of how much servers are contained in this leaf,
+            compared to all present in the tree.
+
+        Args:
+            tree: The tree to modify and draw.
+            path: The path where to store the DOT file.
+        """
+        group_count = len(self.groups)
+
+        # Relabel all the nodes
+        for node in self.nodes:
+            if self.out_degree(node) == 0:
+                # Leaf node
+                groups = sorted(self.nodes[node]['servers'])
+                group_share = '{:.2f}%'.format(100 * len(groups) / group_count)
+                self.nodes[node]['label'] = '\n'.join([group_share] + groups)
+                self.nodes[node]['shape'] = 'rectangle'
+            else:
+                # Not a leaf node
+                self.nodes[node]['label'] = ''
+        networkx.drawing.nx_pydot.write_dot(self, path)

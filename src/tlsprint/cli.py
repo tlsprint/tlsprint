@@ -1,7 +1,6 @@
 import click
 
 from tlsprint.learn import learn_models
-from tlsprint.misc import draw_model_tree
 
 
 @click.group()
@@ -14,4 +13,4 @@ def main():
 @click.argument('output')
 def learn(model_directory, output):
     tree = learn_models(model_directory)
-    draw_model_tree(tree, output)
+    tree.draw(output)
