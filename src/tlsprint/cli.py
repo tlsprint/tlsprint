@@ -1,3 +1,5 @@
+import pickle
+
 import click
 
 from tlsprint.learn import learn_models
@@ -11,21 +13,21 @@ def main():
 
 @main.command('learn')
 @click.argument('model_directory', type=click.Path(exists=True))
-@click.argument('output')
+@click.argument('output', type=click.File('wb'))
 def learn_command(model_directory, output):
-    """Learn the model tree of all models in the specified directory. Returns
-    a DOT file with the model tree."""
+    """Learn the model tree of all models in the specified directory and write
+    the tree to 'output' as a pickled object."""
     tree = learn_models(model_directory)
-    tree.draw(output)
+    pickle.dump(tree, output)
 
 
 @main.command('identify')
-@click.argument('model_directory', type=click.Path(exists=True))
-def identify_command(model_directory):
-    """Learn the model and identify the implementation. Assumes
+@click.argument('model', type=click.File('rb'))
+def identify_command(model):
+    """Uses the learned model to identify the implementation. Assumes
     TLSAttackerConnector is running on port 6666 of the localhost, pointing the
     the target to identify."""
-    tree = learn_models(model_directory)
+    tree = pickle.load(model)
     tree.condense()
     groups = identify(tree)
 
