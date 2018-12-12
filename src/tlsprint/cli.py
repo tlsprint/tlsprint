@@ -35,5 +35,5 @@ def identify_command(model):
         click.echo('Target belongs to one of the following groups:')
         for i, group in enumerate(groups):
             click.echo(f'Group {i + 1}:')
-            click.echo('\n'.join(tree.model_mapping[group]))
+            click.echo('\n'.join(sorted(tree.model_mapping[group])))
             click.echo()
