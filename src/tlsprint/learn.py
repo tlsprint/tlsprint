@@ -268,7 +268,7 @@ class ModelTree(networkx.DiGraph):
                 subtree = self.subtree(two_up)
                 groups = self.nodes[leaf]['servers']
 
-                if subtree.groups == groups:
+                if subtree.groups == groups and subtree.out_degree(two_up) == len(subtree.leaves):
                     # List the servers at this root node in the original tree,
                     # and remove the other nodes
                     self.nodes[two_up]['servers'] = groups
