@@ -112,3 +112,8 @@ dmypy.json
 
 # Include everything from TLSAttackerConnector
 !/src/tlsprint/connector/*
+
+# Include the `learnedModel.dot` files in the `models` directory, ignore the
+# rest
+/models/*/*
+!/models/*/learnedModel.dot
