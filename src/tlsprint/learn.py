@@ -158,9 +158,9 @@ def learn_models(directory):
                 # This is where the deduplication happens
                 models[f.read()].append(server)
 
-                logger.info(f"Found model for: {server}")
+                logger.info("Found model for: {}".format(server))
         except OSError:
-            logger.warning(f"Could not find model for: {server}")
+            logger.warning("Could not find model for: {}".format(server))
 
     # Initialize an empty tree with a single node, all models will be merged
     # into this tree.

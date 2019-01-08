@@ -58,11 +58,11 @@ def identify(tree):
                 # Log the node, color it and draw the graph
                 print(response_node)
                 tree.nodes[response_node]["color"] = "red"
-                tree.draw(f"iteration-{iteration}-pre-prune.gv")
+                tree.draw("iteration-{}-pre-prune.gv".format(iteration))
 
                 leaf_groups = tree.nodes[response_node]["servers"]
                 tree.prune_groups(groups - leaf_groups)
-                tree.draw(f"iteration-{iteration}-post-prune.gv")
+                tree.draw("iteration-{}-post-prune.gv".format(iteration))
                 descending = False
             else:
                 current_node = response_node
@@ -71,7 +71,7 @@ def identify(tree):
         # from right before this step
         groups = tree.groups
         tree.condense()
-        tree.draw(f"iteration-{iteration}-condensed.gv")
+        tree.draw("iteration-{}-condensed.gv".format(iteration))
 
         if not tree.groups:
             connector.close()
