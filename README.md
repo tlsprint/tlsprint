@@ -1,25 +1,25 @@
 # TLSprint
 
-Fingerprint TLS implementations using state machines. inferred by
+Fingerprint TLS implementations using state machines inferred by
 [StateLearner](https://github.com/jderuiter/statelearner/). StateLearner can
 learn state machines for (in this case TLS) implementations using a black-box
-approach. Different implementations can result in a different state machine,
-which makes it possible to differentiate them. By combining these state
-machines into a single tree, and then probing a live implementation, `tlsprint`
-makes it possible to fingerprint the TLS implementation running on the target.
+approach. Different implementations can have a different state machine, which
+makes it possible to differentiate them. By combining these state machines into
+a single tree, and then probing a live implementation, `tlsprint` makes it
+possible to fingerprint the TLS implementation running on the target.
 
 ## Installation
 
 Install the latest release from PyPi:
 
 ```shell
-pip install tlsprint`
+pip install tlsprint
 ```
 
 ## Learn
 
-Note: This step is optional, a `model.p` is included in the distribution, which
-contains a model created using 27 unique state machines, representing 283
+**Note**: This step is optional, a `model.p` is included in the distribution,
+which contains a model created using 27 unique state machines, representing 283
 different TLS implementations. For the full list of implementations, check the
 `models` directory in the repository.
 
@@ -42,7 +42,7 @@ can be done be running
 tlsprint identify <target>
 ```
 
-This defaults to port 443, but a custom port can be specified by adding
+This defaults to port 443, a custom port can be specified by adding
 `--target-port <port>`.
 
 The command returns a list of possible implementations. All these
