@@ -44,8 +44,6 @@ def identify_command(target, target_port, model):
     groups = identify(tree, target, target_port)
 
     if groups:
-        click.echo("Target belongs to one of the following groups:")
-        for i, group in enumerate(groups):
-            click.echo("Group {}:".format(i + 1))
-            click.echo("\n".join(sorted(tree.model_mapping[group])))
-            click.echo()
+        group = list(groups)[0]
+        click.echo("Target has one of the following implementations:")
+        click.echo("\n".join(sorted(tree.model_mapping[group])))

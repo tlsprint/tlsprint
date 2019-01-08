@@ -81,7 +81,6 @@ def identify(tree, target, target_port=443):
 
             if response_node in leaves:
                 # Log the node, color it and draw the graph
-                print(response_node)
                 tree.nodes[response_node]["color"] = "red"
                 tree.draw("iteration-{}-pre-prune.gv".format(iteration))
 
