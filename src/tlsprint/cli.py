@@ -11,9 +11,9 @@ def main():
     pass
 
 
-@main.command('learn')
-@click.argument('model_directory', type=click.Path(exists=True))
-@click.argument('output', type=click.File('wb'))
+@main.command("learn")
+@click.argument("model_directory", type=click.Path(exists=True))
+@click.argument("output", type=click.File("wb"))
 def learn_command(model_directory, output):
     """Learn the model tree of all models in the specified directory and write
     the tree to 'output' as a pickled object."""
@@ -21,8 +21,8 @@ def learn_command(model_directory, output):
     pickle.dump(tree, output)
 
 
-@main.command('identify')
-@click.argument('model', type=click.File('rb'))
+@main.command("identify")
+@click.argument("model", type=click.File("rb"))
 def identify_command(model):
     """Uses the learned model to identify the implementation. Assumes
     TLSAttackerConnector is running on port 6666 of the localhost, pointing the
@@ -32,8 +32,8 @@ def identify_command(model):
     groups = identify(tree)
 
     if groups:
-        click.echo('Target belongs to one of the following groups:')
+        click.echo("Target belongs to one of the following groups:")
         for i, group in enumerate(groups):
-            click.echo(f'Group {i + 1}:')
-            click.echo('\n'.join(sorted(tree.model_mapping[group])))
+            click.echo(f"Group {i + 1}:")
+            click.echo("\n".join(sorted(tree.model_mapping[group])))
             click.echo()

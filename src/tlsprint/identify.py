@@ -16,19 +16,19 @@ def probe(connector, message):
     # TLSAttackerConnector will never be larger than this, but something more
     # robust is desirable.
     bufsize = 1024
-    connector.sendall((message + '\n').encode())
+    connector.sendall((message + "\n").encode())
     return connector.recv(bufsize).decode().strip()
 
 
 def identify(tree):
-    connector = socket.create_connection(('localhost', 6666))
+    connector = socket.create_connection(("localhost", 6666))
 
     identifing = True
     iteration = 1
     while identifing:
 
         # Reset TLSAttackerConnector
-        probe(connector, 'RESET')
+        probe(connector, "RESET")
 
         # Start at the root of the tree
         current_node = tuple()
@@ -46,23 +46,23 @@ def identify(tree):
 
             # Check if this leads to an existing node, and if this node is a
             # leaf node.
-            response_node = send_node + (response, )
+            response_node = send_node + (response,)
             try:
                 tree[response_node]
             except KeyError:
-                print('No model with this path:')
+                print("No model with this path:")
                 print(response_node)
                 return
 
             if response_node in leaves:
                 # Log the node, color it and draw the graph
                 print(response_node)
-                tree.nodes[response_node]['color'] = 'red'
-                tree.draw(f'iteration-{iteration}-pre-prune.gv')
+                tree.nodes[response_node]["color"] = "red"
+                tree.draw(f"iteration-{iteration}-pre-prune.gv")
 
-                leaf_groups = tree.nodes[response_node]['servers']
+                leaf_groups = tree.nodes[response_node]["servers"]
                 tree.prune_groups(groups - leaf_groups)
-                tree.draw(f'iteration-{iteration}-post-prune.gv')
+                tree.draw(f"iteration-{iteration}-post-prune.gv")
                 descending = False
             else:
                 current_node = response_node
@@ -71,7 +71,7 @@ def identify(tree):
         # from right before this step
         groups = tree.groups
         tree.condense()
-        tree.draw(f'iteration-{iteration}-condensed.gv')
+        tree.draw(f"iteration-{iteration}-condensed.gv")
 
         if not tree.groups:
             connector.close()

@@ -16,10 +16,10 @@ import pydot
 
 def _append_servers(tree, node, servers):
     try:
-        tree.nodes[node]['servers']
+        tree.nodes[node]["servers"]
     except KeyError:
-        tree.nodes[node]['servers'] = set()
-    tree.nodes[node]['servers'].update(servers)
+        tree.nodes[node]["servers"] = set()
+    tree.nodes[node]["servers"].update(servers)
 
 
 def _merge_graph(tree, root, graph, current_node, servers):
@@ -44,11 +44,11 @@ def _merge_graph(tree, root, graph, current_node, servers):
             # Split the label in the sent and received message. Remove the
             # double quotes and the excess whitespace.
             sent, received = [
-                x.replace('"', '').strip() for x in edge['label'].split('/')
+                x.replace('"', "").strip() for x in edge["label"].split("/")
             ]
 
             # Append the sent and received messages to the tree
-            sent_node = root + (sent, )
+            sent_node = root + (sent,)
             received_node = root + (sent, received)
             tree.add_edge(root, sent_node, label=sent)
             tree.add_edge(sent_node, received_node, label=received)
@@ -66,11 +66,12 @@ def _merge_graph(tree, root, graph, current_node, servers):
                 # Split the label in the sent and received message. Remove the
                 # double quotes and the excess whitespace.
                 sent, received = [
-                    x.replace('"', '').strip() for x in edge['label'].split('/')  # noqa: E501
+                    x.replace('"', "").strip()
+                    for x in edge["label"].split("/")
                 ]
 
                 # Append the sent and received messages to the tree
-                sent_node = root + (sent, )
+                sent_node = root + (sent,)
                 received_node = root + (sent, received)
                 tree.add_edge(root, sent_node, label=sent)
                 tree.add_edge(sent_node, received_node, label=received)
@@ -79,7 +80,7 @@ def _merge_graph(tree, root, graph, current_node, servers):
                 # path can be stopped here. This greatly reduces the number
                 # of redundant nodes, because of 'ConnectionClosed' edges
                 # go the the final node, which always contains many self loops.
-                if 'ConnectionClosed' in received:
+                if "ConnectionClosed" in received:
                     # Append the servers
                     _append_servers(tree, received_node, servers)
 
@@ -98,13 +99,18 @@ def _merge_graph(tree, root, graph, current_node, servers):
                     if current_node == cycle[-1]:
                         loop_edge = graph[current_node][cycle[0]][0]
                         sent, received = [
-                            x.replace('"', '').strip() for x in loop_edge['label'].split('/')  # noqa: E501
+                            x.replace('"', "").strip()
+                            for x in loop_edge["label"].split("/")
                         ]
 
-                        loop_cause_node = received_node + (sent, )
-                        loop_node = loop_cause_node + ('CYCLE', )
-                        tree.add_edge(received_node, loop_cause_node, label=sent)  # noqa: E501
-                        tree.add_edge(loop_cause_node, loop_node, label='CYCLE')  # noqa: E501
+                        loop_cause_node = received_node + (sent,)
+                        loop_node = loop_cause_node + ("CYCLE",)
+                        tree.add_edge(
+                            received_node, loop_cause_node, label=sent
+                        )
+                        tree.add_edge(
+                            loop_cause_node, loop_node, label="CYCLE"
+                        )
 
                         # Append the servers
                         _append_servers(tree, loop_node, servers)
@@ -114,7 +120,9 @@ def _merge_graph(tree, root, graph, current_node, servers):
 
                 if not found_loop:
                     # Recurse with new root and current node
-                    tree = _merge_graph(tree, received_node, graph, neighbor, servers)  # noqa: E501
+                    tree = _merge_graph(
+                        tree, received_node, graph, neighbor, servers
+                    )
 
     return tree
 
@@ -146,13 +154,13 @@ def learn_models(directory):
         # and log this event.
         try:
             model_root = Path(directory)
-            with (model_root / server / 'learnedModel.dot').open() as f:
+            with (model_root / server / "learnedModel.dot").open() as f:
                 # This is where the deduplication happens
                 models[f.read()].append(server)
 
-                logger.info(f'Found model for: {server}')
+                logger.info(f"Found model for: {server}")
         except OSError:
-            logger.warning(f'Could not find model for: {server}')
+            logger.warning(f"Could not find model for: {server}")
 
     # Initialize an empty tree with a single node, all models will be merged
     # into this tree.
@@ -167,7 +175,7 @@ def learn_models(directory):
     # the ModelTree
     tree.model_mapping = {}
     for i, (model, servers) in enumerate(models.items()):
-        name = 'model-{}'.format(i)
+        name = "model-{}".format(i)
         tree.model_mapping[name] = servers
         models[model] = [name]
 
@@ -181,13 +189,12 @@ def learn_models(directory):
         graph = networkx.drawing.nx_pydot.from_pydot(pydot_graph)
 
         # The start node is always 's0'
-        tree = _merge_graph(tree, root, graph, 's0', servers)
+        tree = _merge_graph(tree, root, graph, "s0", servers)
 
     return tree
 
 
 class ModelTree(networkx.DiGraph):
-
     @property
     def leaves(self):
         return [node for node in self.nodes if self.out_degree(node) == 0]
@@ -195,7 +202,9 @@ class ModelTree(networkx.DiGraph):
     @property
     def groups(self):
         return {
-            group for leaf in self.leaves for group in self.nodes[leaf]['servers']  # noqa: E501
+            group
+            for leaf in self.leaves
+            for group in self.nodes[leaf]["servers"]
         }
 
     def subtree(self, node):
@@ -236,11 +245,11 @@ class ModelTree(networkx.DiGraph):
 
         for leaf in self.leaves:
             # Start by removing the groups from every leaf node
-            self.nodes[leaf]['servers'] -= groups
+            self.nodes[leaf]["servers"] -= groups
 
             # If the set is non empty, we can remove it and also their
             # predecessors if they are only connected to this leaf.
-            if not self.nodes[leaf]['servers']:
+            if not self.nodes[leaf]["servers"]:
                 self.prune_node(leaf)
 
     def condense(self):
@@ -250,7 +259,7 @@ class ModelTree(networkx.DiGraph):
         # Remove leafs that contain 100% of the groups
         groups = self.groups
         for leaf in self.leaves:
-            if self.nodes[leaf]['servers'] == groups:
+            if self.nodes[leaf]["servers"] == groups:
                 self.prune_node(leaf)
 
         # For each leaf, check if its parent contains other groups. If not,
@@ -266,12 +275,14 @@ class ModelTree(networkx.DiGraph):
                 two_up = list(self.predecessors(one_up))[0]
 
                 subtree = self.subtree(two_up)
-                groups = self.nodes[leaf]['servers']
+                groups = self.nodes[leaf]["servers"]
 
-                if subtree.groups == groups and subtree.out_degree(two_up) == len(subtree.leaves):
+                if subtree.groups == groups and subtree.out_degree(
+                    two_up
+                ) == len(subtree.leaves):
                     # List the servers at this root node in the original tree,
                     # and remove the other nodes
-                    self.nodes[two_up]['servers'] = groups
+                    self.nodes[two_up]["servers"] = groups
                     redundant_nodes = set(subtree.nodes) - {two_up}
                     self.remove_nodes_from(redundant_nodes)
                     changed = True
@@ -296,11 +307,11 @@ class ModelTree(networkx.DiGraph):
         for node in self.nodes:
             if self.out_degree(node) == 0:
                 # Leaf node
-                groups = sorted(self.nodes[node]['servers'])
-                group_share = '{:.2f}%'.format(100 * len(groups) / group_count)
-                self.nodes[node]['label'] = '\n'.join([group_share] + groups)
-                self.nodes[node]['shape'] = 'rectangle'
+                groups = sorted(self.nodes[node]["servers"])
+                group_share = "{:.2f}%".format(100 * len(groups) / group_count)
+                self.nodes[node]["label"] = "\n".join([group_share] + groups)
+                self.nodes[node]["shape"] = "rectangle"
             else:
                 # Not a leaf node
-                self.nodes[node]['label'] = ''
+                self.nodes[node]["label"] = ""
         networkx.drawing.nx_pydot.write_dot(self, path)
