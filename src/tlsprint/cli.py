@@ -26,10 +26,22 @@ def learn_command(model_directory, output):
 @main.command("identify")
 @click.argument("target")
 @click.option("-p", "--target-port", default=443)
-@click.option("--model", type=click.File("rb"))
-def identify_command(target, target_port, model):
+@click.option(
+    "--model",
+    help=(
+        "Optional custom model to use (output from `learn`),"
+        " defaults to model included in the distribution."
+    ),
+    type=click.File("rb"),
+)
+@click.option(
+    "--graph-dir",
+    help="Directory to store intermediate graphs, if desired.",
+    type=click.Path(file_okay=False, writable=True),
+)
+def identify_command(target, target_port, model, graph_dir):
     """Uses the learned model to identify the implementation running on the
-    target. By default this will use the models provided with the distribution,
+    target. By default this will use the model provided with the distribution,
     but a custom model can be supplied.
     """
     if model:
@@ -41,7 +53,7 @@ def identify_command(target, target_port, model):
         )
 
     tree.condense()
-    groups = identify(tree, target, target_port)
+    groups = identify(tree, target, target_port, graph_dir)
 
     if groups:
         group = list(groups)[0]

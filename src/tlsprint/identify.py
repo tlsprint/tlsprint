@@ -1,6 +1,7 @@
 """Identification components, to be used after learning the model tree."""
 
 import os
+import pathlib
 import pkg_resources
 import random
 import socket
@@ -23,7 +24,12 @@ def probe(connector, message):
     return connector.recv(bufsize).decode().strip()
 
 
-def identify(tree, target, target_port=443):
+def identify(tree, target, target_port=443, graph_dir=None):
+    # Create output directory if required
+    if graph_dir:
+        graph_dir = pathlib.Path(graph_dir)
+        graph_dir.mkdir(exist_ok=True)
+
     # Start TLSAttackerConnector
     connector_path = pkg_resources.resource_filename(
         __name__, os.path.join("connector", "TLSAttackerConnector2.0.jar")
@@ -82,11 +88,22 @@ def identify(tree, target, target_port=443):
             if response_node in leaves:
                 # Log the node, color it and draw the graph
                 tree.nodes[response_node]["color"] = "red"
-                tree.draw("iteration-{}-pre-prune.gv".format(iteration))
+
+                if graph_dir:
+                    tree.draw(
+                        graph_dir
+                        / "iteration-{}-pre-prune.gv".format(iteration)
+                    )
 
                 leaf_groups = tree.nodes[response_node]["servers"]
                 tree.prune_groups(groups - leaf_groups)
-                tree.draw("iteration-{}-post-prune.gv".format(iteration))
+
+                if graph_dir:
+                    tree.draw(
+                        graph_dir
+                        / "iteration-{}-post-prune.gv".format(iteration)
+                    )
+
                 descending = False
             else:
                 current_node = response_node
@@ -95,7 +112,11 @@ def identify(tree, target, target_port=443):
         # from right before this step
         groups = tree.groups
         tree.condense()
-        tree.draw("iteration-{}-condensed.gv".format(iteration))
+
+        if graph_dir:
+            tree.draw(
+                graph_dir / "iteration-{}-condensed.gv".format(iteration)
+            )
 
         if not tree.groups:
             connector.close()
