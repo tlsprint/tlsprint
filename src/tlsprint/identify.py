@@ -1,7 +1,10 @@
 """Identification components, to be used after learning the model tree."""
 
+import os
+import pkg_resources
 import random
 import socket
+import subprocess
 
 
 def probe(connector, message):
@@ -20,7 +23,29 @@ def probe(connector, message):
     return connector.recv(bufsize).decode().strip()
 
 
-def identify(tree):
+def identify(tree, target, target_port=443):
+    # Start TLSAttackerConnector
+    connector_path = pkg_resources.resource_filename(
+        __name__, os.path.join("connector", "TLSAttackerConnector2.0.jar")
+    )
+    connector_process = subprocess.Popen(
+        [
+            "java",
+            "-jar",
+            connector_path,
+            "--targetHost",
+            target,
+            "--targetPort",
+            str(target_port),
+        ],
+        stdout=subprocess.PIPE,
+    )
+
+    # Wait until the first line to stdout is written, this means the connector
+    # is initialized.
+    connector_process.stdout.readline()
+
+    # Connect to the connector socket
     connector = socket.create_connection(("localhost", 6666))
 
     identifing = True
@@ -78,3 +103,7 @@ def identify(tree):
             return groups
 
         iteration += 1
+
+    # Close the socket and ensure the process is terminated
+    connector.close()
+    connector_process.terminate()

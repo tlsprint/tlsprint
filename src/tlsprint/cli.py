@@ -1,3 +1,5 @@
+import os
+import pkg_resources
 import pickle
 
 import click
@@ -22,14 +24,24 @@ def learn_command(model_directory, output):
 
 
 @main.command("identify")
-@click.argument("model", type=click.File("rb"))
-def identify_command(model):
-    """Uses the learned model to identify the implementation. Assumes
-    TLSAttackerConnector is running on port 6666 of the localhost, pointing the
-    the target to identify."""
-    tree = pickle.load(model)
+@click.argument("target")
+@click.option("-p", "--target-port", default=443)
+@click.option("--model", type=click.File("rb"))
+def identify_command(target, target_port, model):
+    """Uses the learned model to identify the implementation running on the
+    target. By default this will use the models provided with the distribution,
+    but a custom model can be supplied.
+    """
+    if model:
+        tree = pickle.load(model)
+    else:
+        default_location = os.path.join("data", "model.p")
+        tree = pickle.loads(
+            pkg_resources.resource_string(__name__, default_location)
+        )
+
     tree.condense()
-    groups = identify(tree)
+    groups = identify(tree, target, target_port)
 
     if groups:
         click.echo("Target belongs to one of the following groups:")
