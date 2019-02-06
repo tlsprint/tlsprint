@@ -92,7 +92,7 @@ def identify(tree, target, target_port=443, graph_dir=None):
                 if graph_dir:
                     tree.draw(
                         graph_dir
-                        / "iteration-{}-pre-prune.gv".format(iteration)
+                        / "iteration-{}.1-pre-prune.gv".format(iteration)
                     )
 
                 leaf_groups = tree.nodes[response_node]["servers"]
@@ -101,7 +101,7 @@ def identify(tree, target, target_port=443, graph_dir=None):
                 if graph_dir:
                     tree.draw(
                         graph_dir
-                        / "iteration-{}-post-prune.gv".format(iteration)
+                        / "iteration-{}.2-post-prune.gv".format(iteration)
                     )
 
                 descending = False
@@ -115,7 +115,7 @@ def identify(tree, target, target_port=443, graph_dir=None):
 
         if graph_dir:
             tree.draw(
-                graph_dir / "iteration-{}-condensed.gv".format(iteration)
+                graph_dir / "iteration-{}.3-condensed.gv".format(iteration)
             )
 
         if not tree.groups:
