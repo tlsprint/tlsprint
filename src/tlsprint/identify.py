@@ -86,10 +86,9 @@ def identify(tree, target, target_port=443, graph_dir=None):
                 return
 
             if response_node in leaves:
-                # Log the node, color it and draw the graph
-                tree.nodes[response_node]["color"] = "red"
-
                 if graph_dir:
+                    # Color the path leading to the final response node.
+                    tree.color_path(response_node, "red")
                     tree.draw(
                         graph_dir
                         / "iteration-{}.1-pre-prune.gv".format(iteration)
@@ -103,6 +102,9 @@ def identify(tree, target, target_port=443, graph_dir=None):
                         graph_dir
                         / "iteration-{}.2-post-prune.gv".format(iteration)
                     )
+
+                    # Clear the path color after drawing this graph
+                    tree.color_path(response_node, None)
 
                 descending = False
             else:

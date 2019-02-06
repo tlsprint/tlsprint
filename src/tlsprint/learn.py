@@ -315,3 +315,26 @@ class ModelTree(networkx.DiGraph):
                 # Not a leaf node
                 self.nodes[node]["label"] = ""
         networkx.drawing.nx_pydot.write_dot(self, path)
+
+    def color_path(self, endpoint, color):
+        """Color the nodes and edges from the root up to the given endpoint.
+
+        Args:
+            endpoint: Node that indicated the end of the path to be colored.
+            color: Color to give to the path. If color is None, the color
+                attribute will be removed instead.
+        """
+        path_nodes = networkx.shortest_path(self, (), endpoint)
+        path_edges = list(zip(path_nodes, path_nodes[1:]))
+
+        nodes = [self.nodes[node] for node in path_nodes]
+        edges = [self[tail][head] for tail, head in path_edges]
+
+        for target in nodes + edges:
+            if color is None:
+                try:
+                    del target["color"]
+                except KeyError:
+                    pass
+            else:
+                target["color"] = color
