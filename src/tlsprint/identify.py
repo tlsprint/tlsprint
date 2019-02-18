@@ -90,18 +90,14 @@ def identify(tree, target, target_port=443, graph_dir=None):
                 tree.nodes[response_node]["color"] = "red"
 
                 if graph_dir:
-                    tree.draw(
-                        graph_dir
-                        / "iteration-{}-pre-prune.gv".format(iteration)
-                    )
+                    tree.draw(graph_dir / "iteration-{}-pre-prune.gv".format(iteration))
 
                 leaf_groups = tree.nodes[response_node]["servers"]
                 tree.prune_groups(groups - leaf_groups)
 
                 if graph_dir:
                     tree.draw(
-                        graph_dir
-                        / "iteration-{}-post-prune.gv".format(iteration)
+                        graph_dir / "iteration-{}-post-prune.gv".format(iteration)
                     )
 
                 descending = False
@@ -114,9 +110,7 @@ def identify(tree, target, target_port=443, graph_dir=None):
         tree.condense()
 
         if graph_dir:
-            tree.draw(
-                graph_dir / "iteration-{}-condensed.gv".format(iteration)
-            )
+            tree.draw(graph_dir / "iteration-{}-condensed.gv".format(iteration))
 
         if not tree.groups:
             connector.close()

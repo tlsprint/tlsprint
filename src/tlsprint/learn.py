@@ -66,8 +66,7 @@ def _merge_graph(tree, root, graph, current_node, servers):
                 # Split the label in the sent and received message. Remove the
                 # double quotes and the excess whitespace.
                 sent, received = [
-                    x.replace('"', "").strip()
-                    for x in edge["label"].split("/")
+                    x.replace('"', "").strip() for x in edge["label"].split("/")
                 ]
 
                 # Append the sent and received messages to the tree
@@ -105,12 +104,8 @@ def _merge_graph(tree, root, graph, current_node, servers):
 
                         loop_cause_node = received_node + (sent,)
                         loop_node = loop_cause_node + ("CYCLE",)
-                        tree.add_edge(
-                            received_node, loop_cause_node, label=sent
-                        )
-                        tree.add_edge(
-                            loop_cause_node, loop_node, label="CYCLE"
-                        )
+                        tree.add_edge(received_node, loop_cause_node, label=sent)
+                        tree.add_edge(loop_cause_node, loop_node, label="CYCLE")
 
                         # Append the servers
                         _append_servers(tree, loop_node, servers)
@@ -120,9 +115,7 @@ def _merge_graph(tree, root, graph, current_node, servers):
 
                 if not found_loop:
                     # Recurse with new root and current node
-                    tree = _merge_graph(
-                        tree, received_node, graph, neighbor, servers
-                    )
+                    tree = _merge_graph(tree, received_node, graph, neighbor, servers)
 
     return tree
 
@@ -201,11 +194,7 @@ class ModelTree(networkx.DiGraph):
 
     @property
     def groups(self):
-        return {
-            group
-            for leaf in self.leaves
-            for group in self.nodes[leaf]["servers"]
-        }
+        return {group for leaf in self.leaves for group in self.nodes[leaf]["servers"]}
 
     def subtree(self, node):
         """Return the subtree where `node` is the root, as a ModelTree."""
@@ -277,9 +266,9 @@ class ModelTree(networkx.DiGraph):
                 subtree = self.subtree(two_up)
                 groups = self.nodes[leaf]["servers"]
 
-                if subtree.groups == groups and subtree.out_degree(
-                    two_up
-                ) == len(subtree.leaves):
+                if subtree.groups == groups and subtree.out_degree(two_up) == len(
+                    subtree.leaves
+                ):
                     # List the servers at this root node in the original tree,
                     # and remove the other nodes
                     self.nodes[two_up]["servers"] = groups

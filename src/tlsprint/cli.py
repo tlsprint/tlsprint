@@ -48,9 +48,7 @@ def identify_command(target, target_port, model, graph_dir):
         tree = pickle.load(model)
     else:
         default_location = os.path.join("data", "model.p")
-        tree = pickle.loads(
-            pkg_resources.resource_string(__name__, default_location)
-        )
+        tree = pickle.loads(pkg_resources.resource_string(__name__, default_location))
 
     tree.condense()
     groups = identify(tree, target, target_port, graph_dir)
