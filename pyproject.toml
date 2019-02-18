@@ -4,3 +4,6 @@ requires = [
     "setuptools_scm",
     "wheel",
 ]
+
+[tool.black]
+py36 = true
