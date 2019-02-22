@@ -41,17 +41,7 @@ def _merge_graph(tree, root, graph, current_node, servers):
         for edge_number in graph[current_node][current_node]:
             edge = graph[current_node][current_node][edge_number]
 
-            # Split the label in the sent and received message. Remove the
-            # double quotes and the excess whitespace.
-            sent, received = [
-                x.replace('"', "").strip() for x in edge["label"].split("/")
-            ]
-
-            # Append the sent and received messages to the tree
-            sent_node = root + (sent,)
-            received_node = root + (sent, received)
-            tree.add_edge(root, sent_node, label=sent)
-            tree.add_edge(sent_node, received_node, label=received)
+            received_node = _merge_path_from_label(tree, root, edge["label"])
 
             # Append the servers to the final node as attribute
             _append_servers(tree, received_node, servers)
@@ -65,9 +55,9 @@ def _merge_graph(tree, root, graph, current_node, servers):
 
                 # Split the label in the sent and received message. Remove the
                 # double quotes and the excess whitespace.
-                sent, received = [
+                sent, received = (
                     x.replace('"', "").strip() for x in edge["label"].split("/")
-                ]
+                )
 
                 # Append the sent and received messages to the tree
                 sent_node = root + (sent,)
@@ -304,3 +294,166 @@ class ModelTree(networkx.DiGraph):
                 # Not a leaf node
                 self.nodes[node]["label"] = ""
         networkx.drawing.nx_pydot.write_dot(self, path)
+
+
+def normalize_graph(dot_graph: str) -> ModelTree:
+    """Normalizes an input graph into a ModelTree. It is possible that an input
+    graph has multiple DOT representations (think of whitespace differences,
+    but also graphs that have the same structure but different node names. In
+    order to see if these are identical, we normalize them.
+
+    Args:
+        dot_graph: The DOT representation of the input graph
+
+    Returns:
+        A normalized ModelTree which represents the input graph.
+    """
+    graph = _dot_to_networkx(dot_graph)
+
+    # Assumes there is a node called '__start0', which is connected a single
+    # node in the graph (the entry point)
+    graph_root = list(graph["__start0"])[0]
+
+    # Create the ModelTree that will contain the normalized graph
+    tree = ModelTree()
+    tree_root = ()
+    tree.add_node(tree_root)
+
+    # Normalize the graph by recursively merging in into the tree
+    return _merge_subgraph(tree, tree_root, graph, graph_root)
+
+
+def _merge_subgraph(
+    tree: ModelTree, root: tuple, graph: networkx.DiGraph, current_node: str
+) -> ModelTree:
+    """Recursively merge a directed graph into the passed ModelTree. This is an
+    internal function that is called from `normalize_graph`.
+
+    Args:
+        tree: The tree that is being constructed, and into which the graph will
+            be merged.
+        root: The current root node of the tree, the graph will be merged
+            beginning at this node.
+        graph: The graph to merge into the tree
+        current_node: The current node of the graph to merge
+    """
+    neighbors = list(graph[current_node])
+
+    # If a node has no neighbors, there is nothing to do and this function
+    # returns immediately.
+    if not neighbors:
+        return tree
+
+    # If a node has itself as its only neighbor, then this is a final node, and
+    # we should not recurse (or this will lead to infinite loops. Simple add
+    # its neighbors and return.
+    if neighbors == [current_node]:
+        for _, edge in graph[current_node][current_node].items():
+            received_node = _merge_path_from_label(tree, root, edge["label"])
+        return tree
+
+    # In any other case, follow every edge and recursively merge the rest of
+    # the graph into the tree.
+
+    # Find cycles in this graph, this is used later in the loop, but we only
+    # have to do it once
+    cycles = list(simple_cycles(graph))
+
+    # A node can have multiple neighbors
+    for neighbor in neighbors:
+        # There can be multiple edges between two nodes, each with
+        # a different label. Each edge is numbered, but we ignore this
+        # number.
+        for _, edge in graph[current_node][neighbor].items():
+            # We start by checking if the current node and its neighbor is part
+            # of a cycle. This is the case if the current node if the final
+            # node, and its neighbors is the first node of any cycle (if we do
+            # not check this, we can end up in an infinite loop). To indicate
+            # cycles in the normalized graph, we set a `postfix` value, which
+            # is passed to the `_merge_path_from_label` function.
+            cycle_detected = False
+            postfix = None
+            for cycle in cycles:
+                if current_node == cycle[-1] and neighbor == cycle[0]:
+                    cycle_detected = True
+                    cycle_path = _extract_cycle_path(graph, cycle)
+                    postfix = "|" + cycle_path
+
+            received_node = _merge_path_from_label(
+                tree, root, edge["label"], postfix=postfix
+            )
+
+            # If the received message contains 'ConnectionClosed', this
+            # path can be stopped here. This greatly reduces the number
+            # of redundant nodes, because of 'ConnectionClosed' edges
+            # go the the final node, which always contains many self loops.
+            if "ConnectionClosed" in received_node[-1]:
+                # Do not recurse
+                continue
+
+            # Recurse with new root and current node
+            if not cycle_detected:
+                tree = _merge_subgraph(tree, received_node, graph, neighbor)
+
+    return tree
+
+
+def _merge_path_from_label(
+    tree: ModelTree, root: tuple, label: str, postfix: str = None
+) -> tuple:
+    """Merge a path into the passed tree from a label. The label is assumed to
+    have the format "{{ sent }} / {{ received }}", since this is the format
+    that StateLearner outputs. The nodes will be added as
+
+        root -> sent -> received
+
+    with the appropriate edge labels.
+
+    Args:
+        tree: The path will be added to this graph.
+        root: Point in the tree where the nodes will be added.
+        label: String of the format "{{ sent }} / {{ received }}"
+        postfix: Optional value that will be added to the received node name.
+
+    Returns:
+        The name of the "received" node (which is a tuple), so the caller knows
+        the endpoint of the added path.
+    """
+    # We start by extracting the sent and received messages. Split the label
+    # in the sent and received message. Remove the double quotes and the excess
+    # whitespace.
+    sent, received = [
+        message.replace('"', "").strip() for message in label.split("/", maxsplit=1)
+    ]
+
+    if postfix:
+        received += postfix
+
+    # Append the sent and received messages to the tree
+    sent_node = root + (sent,)
+    received_node = root + (sent, received)
+    tree.add_edge(root, sent_node, label=sent)
+    tree.add_edge(sent_node, received_node, label=received)
+
+    return received_node
+
+
+def _dot_to_networkx(dot_graph):
+    """Convert a DOT string to a networkx graph."""
+    # Read the input graph using `graph_from_dot_data()`. This function returns
+    # a list but StateLearner only puts a single graph in a file. We assume
+    # this this graph is present and do not check the length. A KeyError will
+    # notify us in case of an error.
+    pydot_graph = pydot.graph_from_dot_data(dot_graph)[0]
+
+    # Convert to networkx graph
+    return networkx.drawing.nx_pydot.from_pydot(pydot_graph)
+
+
+def _extract_cycle_path(graph, cycle):
+    cycle = cycle + [cycle[0]]
+    edges = list(zip(cycle, cycle[1:]))
+
+    # We assume there is only one edge between all the nodes in the cycle
+    labels = [graph[edge[0]][edge[1]][0]["label"] for edge in edges]
+    return "CYCLE({})".format(" -> ".join(labels))
