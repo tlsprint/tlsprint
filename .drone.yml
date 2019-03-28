@@ -4,7 +4,7 @@ name: lint
 
 steps:
 - name: lint
-  image: python:3.8
+  image: python:3.7
   commands:
   - pip install -r requirements_dev.txt
   - black --check src/ tests/
@@ -39,7 +39,7 @@ name: test-3.8
 
 steps:
 - name: test
-  image: python:3.8
+  image: python:3.8-rc
   commands:
   - pip install .
   - pip install -r requirements_dev.txt
