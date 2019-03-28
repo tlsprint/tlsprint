@@ -1,0 +1,42 @@
+---
+kind: pipeline
+name: lint
+
+steps:
+- image: python:3.8
+  commands:
+  - pip install -r requirements_dev.txt
+  - black --check src/ tests/
+
+---
+kind: pipeline
+name: test-3.6
+
+steps:
+- image: python:3.6
+  commands:
+  - pip install .
+  - pip install -r requirements_dev.txt
+  - pytest
+
+---
+kind: pipeline
+name: test-3.7
+
+steps:
+- image: python:3.7
+  commands:
+  - pip install .
+  - pip install -r requirements_dev.txt
+  - pytest
+
+---
+kind: pipeline
+name: test-3.8
+
+steps:
+- image: python:3.8
+  commands:
+  - pip install .
+  - pip install -r requirements_dev.txt
+  - pytest
