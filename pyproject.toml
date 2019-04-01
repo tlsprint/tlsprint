@@ -6,5 +6,5 @@ requires = [
 ]
 
 [tool.black]
-py36 = true
+target-version = ["py36"]
 exclude = "venv"
