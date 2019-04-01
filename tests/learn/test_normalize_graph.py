@@ -7,7 +7,8 @@ def test_one_edge():
         a -> b [label="A / B"]
     }"""
     tree = normalize_graph(dot_graph)
-    assert set(tree.nodes) == {(), ("A",), ("A", "B")}
+    expected = {(), ("A",), ("A", "B")}
+    assert expected == set(tree.nodes)
 
 
 def test_multiple_edges():
@@ -18,7 +19,7 @@ def test_multiple_edges():
         b -> c [label="B / C"]
     }"""
     tree = normalize_graph(dot_graph)
-    assert set(tree.nodes) == {
+    expected = {
         (),
         ("A",),
         ("A", "C"),
@@ -26,6 +27,7 @@ def test_multiple_edges():
         ("A", "B", "B"),
         ("A", "B", "B", "C"),
     }
+    assert expected == set(tree.nodes)
 
 
 def test_multiple_edges_different_structure():
@@ -36,7 +38,7 @@ def test_multiple_edges_different_structure():
         name1 -> name3 [label="A / C"]
     }"""
     tree = normalize_graph(dot_graph)
-    assert set(tree.nodes) == {
+    expected = {
         (),
         ("A",),
         ("A", "C"),
@@ -44,6 +46,7 @@ def test_multiple_edges_different_structure():
         ("A", "B", "B"),
         ("A", "B", "B", "C"),
     }
+    assert expected == set(tree.nodes)
 
 
 def test_final_node_loop():
@@ -54,7 +57,7 @@ def test_final_node_loop():
         b -> b [label="D / B"]
     }"""
     tree = normalize_graph(dot_graph)
-    assert set(tree.nodes) == {
+    expected = {
         (),
         ("A",),
         ("A", "B"),
@@ -63,6 +66,7 @@ def test_final_node_loop():
         ("A", "B", "D"),
         ("A", "B", "D", "B"),
     }
+    assert expected == set(tree.nodes)
 
 
 def test_connection_closed():
@@ -73,7 +77,7 @@ def test_connection_closed():
         a -> b [label="D / B|ConnectionClosed"]
     }"""
     tree = normalize_graph(dot_graph)
-    assert set(tree.nodes) == {
+    expected = {
         (),
         ("A",),
         ("A", "B"),
@@ -82,6 +86,7 @@ def test_connection_closed():
         ("D",),
         ("D", "B|ConnectionClosed"),
     }
+    assert expected == set(tree.nodes)
 
 
 def test_single_node_cycle():
@@ -92,15 +97,20 @@ def test_single_node_cycle():
         b -> b [label="A / E"]
     }"""
     tree = normalize_graph(dot_graph)
-    assert set(tree.nodes) == {
+    expected = {
         (),
         ("A",),
         ("A", "B"),
         ("A", "B", "C"),
         ("A", "B", "C", "D"),
         ("A", "B", "A"),
-        ("A", "B", "A", 'E|CYCLE("A / E")'),
+        ("A", "B", "A", "E"),
+        ("A", "B", "A", "E", "C"),
+        ("A", "B", "A", "E", "C", "D"),
+        ("A", "B", "A", "E", "A"),
+        ("A", "B", "A", "E", "A", 'E|CYCLE("A / E")'),
     }
+    assert expected == set(tree.nodes)
 
 
 def test_multi_node_cycle():
@@ -112,7 +122,7 @@ def test_multi_node_cycle():
         c -> b [label="A / E"]
     }"""
     tree = normalize_graph(dot_graph)
-    assert set(tree.nodes) == {
+    expected = {
         (),
         ("A",),
         ("A", "B"),
@@ -123,3 +133,4 @@ def test_multi_node_cycle():
         ("A", "B", "C", "D", "A"),
         ("A", "B", "C", "D", "A", 'E|CYCLE("C / D" -> "A / E")'),
     }
+    assert expected == set(tree.nodes)

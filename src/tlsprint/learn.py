@@ -324,7 +324,11 @@ def normalize_graph(dot_graph: str) -> ModelTree:
 
 
 def _merge_subgraph(
-    tree: ModelTree, root: tuple, graph: networkx.DiGraph, current_node: str
+    tree: ModelTree,
+    root: tuple,
+    graph: networkx.DiGraph,
+    current_node: str,
+    path: list = None,
 ) -> ModelTree:
     """Recursively merge a directed graph into the passed ModelTree. This is an
     internal function that is called from `normalize_graph`.
@@ -338,6 +342,7 @@ def _merge_subgraph(
         current_node: The current node of the graph to merge
     """
     neighbors = list(graph[current_node])
+    path = path if path else []
 
     # If a node has no neighbors, there is nothing to do and this function
     # returns immediately.
@@ -356,28 +361,33 @@ def _merge_subgraph(
     # the graph into the tree.
 
     # Find cycles in this graph, this is used later in the loop, but we only
-    # have to do it once
+    # have to do it once.
     cycles = list(simple_cycles(graph))
+    print(cycles)
 
     # A node can have multiple neighbors
     for neighbor in neighbors:
+
         # There can be multiple edges between two nodes, each with
         # a different label. Each edge is numbered, but we ignore this
         # number.
         for _, edge in graph[current_node][neighbor].items():
-            # We start by checking if the current node and its neighbor is part
-            # of a cycle. This is the case if the current node if the final
-            # node, and its neighbors is the first node of any cycle (if we do
-            # not check this, we can end up in an infinite loop). To indicate
-            # cycles in the normalized graph, we set a `postfix` value, which
-            # is passed to the `_merge_path_from_label` function.
+            # If this node has been encountered before, we have detected a cycle,
+            # where the current node is the start of the cycle. What we do now, is
+            # create a special response message in which we encode this cycle,
+            # add this to the graph and do not recurse (since this would lead
+            # to an infinite loop otherwise.
             cycle_detected = False
             postfix = None
-            for cycle in cycles:
-                if current_node == cycle[-1] and neighbor == cycle[0]:
-                    cycle_detected = True
-                    cycle_path = _extract_cycle_path(graph, cycle)
-                    postfix = "|" + cycle_path
+
+            if neighbor in path:
+                print(path)
+                cycle_detected = True
+                cycle = path[path.index(neighbor) :]
+                if current_node != neighbor:
+                    cycle += [current_node]
+                cycle_path = _extract_cycle_path(graph, cycle)
+                postfix = "|" + cycle_path
 
             received_node = _merge_path_from_label(
                 tree, root, edge["label"], postfix=postfix
@@ -393,7 +403,9 @@ def _merge_subgraph(
 
             # Recurse with new root and current node
             if not cycle_detected:
-                tree = _merge_subgraph(tree, received_node, graph, neighbor)
+                tree = _merge_subgraph(
+                    tree, received_node, graph, neighbor, path + [current_node]
+                )
 
     return tree
 
