@@ -11,7 +11,7 @@ stages:
 black:
   stage: lint
   script:
-    - black --check src/ tests/
+    - black --check .
 
 py-3.6:
   stage: test

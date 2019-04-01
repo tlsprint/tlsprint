@@ -7,3 +7,4 @@ requires = [
 
 [tool.black]
 py36 = true
+exclude = "venv"
