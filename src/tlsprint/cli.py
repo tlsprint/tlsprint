@@ -1,11 +1,13 @@
+import json
 import os
-import pkg_resources
 import pickle
 
-import click
+import pkg_resources
 
-from tlsprint.learn import learn_models
+import click
+from tlsprint import util
 from tlsprint.identify import identify
+from tlsprint.learn import _dot_to_networkx, learn_models
 
 
 @click.group()
@@ -57,3 +59,31 @@ def identify_command(target, target_port, model, graph_dir):
         group = list(groups)[0]
         click.echo("Target has one of the following implementations:")
         click.echo("\n".join(sorted(tree.model_mapping[group])))
+
+
+@main.command("convert")
+@click.argument("input_file", metavar="INPUT", type=click.File("r"))
+@click.argument("output_file", metavar="OUTPUT", type=click.File("w"))
+@click.option("--name", help="Prefix every node with this name")
+@click.option(
+    "--add-resets",
+    help="Add a 'RESET / -' edge from every sinkhole to the start state.",
+    is_flag=True,
+)
+def convert_command(input_file, output_file, name, add_resets):
+    """Convert a graph from DOT to JSON.
+
+    This is tailored to convert DOT output from LearnLib to the JSON files used
+    by adg-finder. As such, it makes certain assumptions about the structure of
+    the graph. For example, it assumes there is a dummy state called (often
+    called `__start`), which is the only state without any incoming edges. This
+    state is used to find the start state and will then be removed.
+    """
+    graph = _dot_to_networkx(input_file.read())
+
+    # If a name is specified, prefix all nodes with that name
+    if name:
+        graph = util.prefix_nodes(graph, f"{name}_")
+
+    converted = util.convert_graph(graph, add_resets=add_resets)
+    print(json.dumps(converted, indent=4), file=output_file)
