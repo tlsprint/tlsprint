@@ -1,3 +1,6 @@
+from collections import defaultdict
+from pathlib import Path
+
 import networkx
 
 
@@ -7,7 +10,7 @@ def prefix_nodes(graph, prefix):
     return networkx.relabel_nodes(graph, mapping)
 
 
-def add_resets(graph, start):
+def add_resets_edges(graph, start):
     """Add a "RESET / -" edge from every sinkhole to the start state."""
     for node in graph.nodes:
         neighbors = list(graph[node])
@@ -34,7 +37,7 @@ def convert_graph(graph, *, add_resets=False):
 
     # If requested, add reset edges
     if add_resets:
-        add_resets(graph, converted["initial_state"])
+        add_resets_edges(graph, converted["initial_state"])
 
     # Convert all transitions to tuple format
     converted["transitions"] = []
@@ -55,3 +58,42 @@ def convert_graph(graph, *, add_resets=False):
     converted["outputs"] = sorted(outputs)
 
     return converted
+
+
+def dedup_model_dir(model_directory):
+    """Read and deduplicate all models found in the directory and return the
+    results."""
+    root = Path(model_directory)
+    results = defaultdict(lambda: defaultdict(list))
+
+    for implementation_path in root.iterdir():
+        implementation_results = dedup_implementation_dir(implementation_path)
+        for protocol, model_dicts in implementation_results.items():
+            for model, versions in model_dicts.items():
+                results[protocol][model] += versions
+    return results
+
+
+def dedup_implementation_dir(implementation_path):
+    """Perform the deduplication for a single implementation directory."""
+    # Perform a deduplication based on file contents
+    results = defaultdict(lambda: defaultdict(list))
+    implementation = implementation_path.name
+
+    version_path_list = [
+        version_path
+        for version_path in implementation_path.iterdir()
+        if version_path.is_dir()
+    ]
+    for version_path in version_path_list:
+        version = version_path.name
+        for protocol_path in version_path.iterdir():
+            try:
+                with open(protocol_path / "learnedModel.dot") as f:
+                    model = f.read()
+            except OSError:
+                # Skip
+                continue
+            protocol = protocol_path.name
+            results[protocol][model].append((implementation, version))
+    return results

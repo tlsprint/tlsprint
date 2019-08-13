@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+from pathlib import Path
 
 import pkg_resources
 
@@ -86,4 +87,43 @@ def convert_command(input_file, output_file, name, add_resets):
         graph = util.prefix_nodes(graph, f"{name}_")
 
     converted = util.convert_graph(graph, add_resets=add_resets)
-    print(json.dumps(converted, indent=4), file=output_file)
+    json.dump(converted, output_file, indent=4)
+
+
+@main.command("dedup")
+@click.argument("model_directory", type=click.Path(exists=True))
+@click.argument("output_directory", type=click.Path())
+def dedup_command(model_directory, output_directory):
+    """Deduplicate the models directory.
+
+    This reads the directory and assumes the path format
+    `implementation/version/tls_version/learnedModel.dot` for every model. For
+    every TLS protocol version, it groups together models which are the same.
+    It then creates a directory for each TLS version, containing a directory
+    for every unique model. Each model directory then contains the model in
+    both Graphviz and JSON format, and a JSON file which lists the
+    corresponding implementations and versions.
+    """
+    results = util.dedup_model_dir(model_directory)
+    output_path = Path(output_directory)
+    for protocol, models in results.items():
+        for index, (model, versions) in enumerate(models.items()):
+            model_name = f"model-{index + 1}"
+            model_dir = output_path / protocol / model_name
+
+            # Create the directory
+            model_dir.mkdir(parents=True, exist_ok=True)
+
+            # Write the model to this directory, both in Graphviz and JSON
+            # format.
+            with open(model_dir / "model.gv", "w") as f:
+                f.write(model)
+
+            graph = _dot_to_networkx(model)
+            converted = util.convert_graph(graph, add_resets=True)
+            with open(model_dir / "model.json", "w") as f:
+                json.dump(converted, f, indent=4)
+
+            # Add the version list
+            with open(model_dir / "versions.json", "w") as f:
+                json.dump(versions, f, indent=4)
