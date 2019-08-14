@@ -2,10 +2,11 @@
 
 import os
 import pathlib
-import pkg_resources
 import random
 import socket
 import subprocess
+
+import pkg_resources
 
 
 def probe(connector, message):

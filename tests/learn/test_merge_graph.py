@@ -1,5 +1,4 @@
 import networkx
-
 from tlsprint.learn import _merge_graph
 
 

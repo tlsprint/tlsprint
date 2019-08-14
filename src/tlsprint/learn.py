@@ -9,9 +9,9 @@ from collections import defaultdict
 from pathlib import Path
 
 import networkx
+import pydot
 from networkx.algorithms import simple_cycles
 from networkx.algorithms.traversal.depth_first_search import dfs_tree
-import pydot
 
 
 def _append_servers(tree, node, servers):
