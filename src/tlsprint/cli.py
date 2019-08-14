@@ -120,6 +120,7 @@ def dedup_command(model_directory, output_directory):
                 f.write(model)
 
             graph = _dot_to_networkx(model)
+            graph = util.prefix_nodes(graph, f"{model_name}_")
             converted = util.convert_graph(graph, add_resets=True)
             with open(model_dir / "model.json", "w") as f:
                 json.dump(converted, f, indent=4)
