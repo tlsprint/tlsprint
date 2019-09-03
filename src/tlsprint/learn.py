@@ -3,181 +3,18 @@ from the output of StateLearning and create a model of all TLS implementations
 in order to perform fingerprinting.
 """
 
-import logging
-import os
-from collections import defaultdict
+import ast
+import json
 from pathlib import Path
 
 import networkx
 import pydot
-from networkx.algorithms import simple_cycles
 from networkx.algorithms.traversal.depth_first_search import dfs_tree
 
 
-def _append_servers(tree, node, servers):
-    try:
-        tree.nodes[node]["servers"]
-    except KeyError:
-        tree.nodes[node]["servers"] = set()
-    tree.nodes[node]["servers"].update(servers)
-
-
-def _merge_graph(tree, root, graph, current_node, servers):
-    """Merge a single model graph into the tree, used by `learn_models` to
-    create the tree of all merged models.
-
-    Args:
-        tree: The tree that is being constructed, and into which the graph will
-            be merged.
-        root: The current root node of the tree, the graph will be merged
-            beginning at this node.
-        graph: The graph to merge into the tree
-        current_node: The current node of the graph to merge
-        servers: The server implementations corresponding to this graph.
-    """
-    # Any node that has a itself as its only neighbor is a final node, this is
-    # the base case for the recursion.
-    if list(graph[current_node]) == [current_node]:
-        for edge_number in graph[current_node][current_node]:
-            edge = graph[current_node][current_node][edge_number]
-
-            received_node = _merge_path_from_label(tree, root, edge["label"])
-
-            # Append the servers to the final node as attribute
-            _append_servers(tree, received_node, servers)
-
-    # If not the base case, merge the current node into the tree and
-    # recursively merge the rest
-    else:
-        for neighbor in graph[current_node]:
-            for edge_number in graph[current_node][neighbor]:
-                edge = graph[current_node][neighbor][edge_number]
-
-                # Split the label in the sent and received message. Remove the
-                # double quotes and the excess whitespace.
-                sent, received = (
-                    x.replace('"', "").strip() for x in edge["label"].split("/")
-                )
-
-                # Append the sent and received messages to the tree
-                sent_node = root + (sent,)
-                received_node = root + (sent, received)
-                tree.add_edge(root, sent_node, label=sent)
-                tree.add_edge(sent_node, received_node, label=received)
-
-                # If the received message contains 'ConnectionClosed', this
-                # path can be stopped here. This greatly reduces the number
-                # of redundant nodes, because of 'ConnectionClosed' edges
-                # go the the final node, which always contains many self loops.
-                if "ConnectionClosed" in received:
-                    # Append the servers
-                    _append_servers(tree, received_node, servers)
-
-                    # Do not recurse
-                    continue
-
-                # It can happen that a model contains a cycle, this is detected
-                # by checking if the current node is the final node in any of
-                # the values returned by `simple_cycles`. When a cycle is
-                # detected, append an additional node with the message that
-                # causes the cycle, and include 'CYCLE' in the edge label, and
-                # stop recursing.
-                found_loop = False
-                cycles = list(simple_cycles(graph))
-                for cycle in cycles:
-                    if current_node == cycle[-1]:
-                        loop_edge = graph[current_node][cycle[0]][0]
-                        sent, received = [
-                            x.replace('"', "").strip()
-                            for x in loop_edge["label"].split("/")
-                        ]
-
-                        loop_cause_node = received_node + (sent,)
-                        loop_node = loop_cause_node + ("CYCLE",)
-                        tree.add_edge(received_node, loop_cause_node, label=sent)
-                        tree.add_edge(loop_cause_node, loop_node, label="CYCLE")
-
-                        # Append the servers
-                        _append_servers(tree, loop_node, servers)
-
-                        # Do not recurse
-                        found_loop = True
-
-                if not found_loop:
-                    # Recurse with new root and current node
-                    tree = _merge_graph(tree, received_node, graph, neighbor, servers)
-
-    return tree
-
-
-def learn_models(directory):
-    """Learn the complete tree from all the different models.
-
-    Args:
-        directory: A directory that contains the output of StateLearner. It
-            expects the directory to contain directories with the names of the
-            different TLS implementations, where each TLS directory contains a
-            file 'learnedModel.dot'. Will skip implementations where this file
-            is absent.
-
-    Returns:
-        tree: A networkx tree containing the paths for all models.
-    """
-    logger = logging.getLogger()
-
-    # Collect the names of the server directories
-    server_dirs = [f.name for f in os.scandir(directory) if f.is_dir()]
-
-    # Merge duplicates together, by using the DOT model as dictionary key,
-    # and the server list as the value.
-    models = defaultdict(list)
-
-    for server in server_dirs:
-        # Not all directories actually contain a model. Skip this directory
-        # and log this event.
-        try:
-            model_root = Path(directory)
-            with (model_root / server / "learnedModel.dot").open() as f:
-                # This is where the deduplication happens
-                models[f.read()].append(server)
-
-                logger.info("Found model for: {}".format(server))
-        except OSError:
-            logger.warning("Could not find model for: {}".format(server))
-
-    # Initialize an empty tree with a single node, all models will be merged
-    # into this tree.
-    tree = ModelTree()
-    root = tuple()
-    tree.add_node(root)
-
-    # For identical models, store a model name instead of the list and create a
-    # mapping between the name and the implementations. This will reduce the
-    # size of the tree when drawn, and will no longer cause confusing as to
-    # which implementations have the same model. This mapping will be stored in
-    # the ModelTree
-    tree.model_mapping = {}
-    for i, (model, servers) in enumerate(models.items()):
-        name = "model-{}".format(i)
-        tree.model_mapping[name] = servers
-        models[model] = [name]
-
-    # For each model, convert to a networkx graph and merge into the tree
-    for model, servers in models.items():
-        # 'graph_from_dot_data()' returns a list, but StateLearner only puts a
-        # single graph in a file, we don't have to check the length.
-        pydot_graph = pydot.graph_from_dot_data(model)[0]
-
-        # Convert to networkx graph
-        graph = networkx.drawing.nx_pydot.from_pydot(pydot_graph)
-
-        # The start node is always 's0'
-        tree = _merge_graph(tree, root, graph, "s0", servers)
-
-    return tree
-
-
 class ModelTree(networkx.DiGraph):
+    """Data structure to store an ADG or DDG created from LearnLib models."""
+
     @property
     def leaves(self):
         return [node for node in self.nodes if self.out_degree(node) == 0]
@@ -282,15 +119,21 @@ class ModelTree(networkx.DiGraph):
             tree: The tree to modify and draw.
             fmt: Any format supported by Graphviz in which to draw to graph.
         """
-        model_count = len(self.models)
+        try:
+            model_count = len(self.models)
+        except KeyError:
+            pass
 
         # Relabel all the nodes
         for node in self.nodes:
             if self.out_degree(node) == 0:
                 # Leaf node
-                models = sorted(self.nodes[node]["models"])
-                model_share = "{:.2f}%".format(100 * len(models) / model_count)
-                self.nodes[node]["label"] = "\n".join([model_share] + models)
+                try:
+                    models = sorted(self.nodes[node]["models"])
+                    model_share = "{:.2f}%".format(100 * len(models) / model_count)
+                    self.nodes[node]["label"] = "\n".join([model_share] + models)
+                except KeyError:
+                    self.nodes[node]["label"] = ""
                 self.nodes[node]["shape"] = "rectangle"
             else:
                 # Not a leaf node
@@ -299,14 +142,17 @@ class ModelTree(networkx.DiGraph):
         return dot.create(format=fmt)
 
 
-def normalize_graph(dot_graph: str) -> ModelTree:
+def normalize_graph(dot_graph: str, *, max_depth=10) -> ModelTree:
     """Normalizes an input graph into a ModelTree. It is possible that an input
     graph has multiple DOT representations (think of whitespace differences,
     but also graphs that have the same structure but different node names. In
-    order to see if these are identical, we normalize them.
+    order to see if these are identical, we normalize them by unwrapping them
+    as a tree.
 
     Args:
         dot_graph: The DOT representation of the input graph
+        max_depth: The maximum depth of the tree, especially relevant when the
+            graph contains cycles.
 
     Returns:
         A normalized ModelTree which represents the input graph.
@@ -322,8 +168,8 @@ def normalize_graph(dot_graph: str) -> ModelTree:
     tree_root = ()
     tree.add_node(tree_root)
 
-    # Normalize the graph by recursively merging in into the tree
-    return _merge_subgraph(tree, tree_root, graph, graph_root)
+    # Normalize the graph by recursively merging into the tree
+    return _merge_subgraph(tree, tree_root, graph, graph_root, 0, max_depth)
 
 
 def _merge_subgraph(
@@ -331,7 +177,8 @@ def _merge_subgraph(
     root: tuple,
     graph: networkx.DiGraph,
     current_node: str,
-    path: list = None,
+    current_depth: int,
+    max_depth: int,
 ) -> ModelTree:
     """Recursively merge a directed graph into the passed ModelTree. This is an
     internal function that is called from `normalize_graph`.
@@ -343,30 +190,21 @@ def _merge_subgraph(
             beginning at this node.
         graph: The graph to merge into the tree
         current_node: The current node of the graph to merge
+        current_depth: The current recursion depth, this function aborts when
+            depth > max_depth.
+        max_depth: The maximum recursion depth, primaraly useful to escape
+            cycles, so it should be higher than the valid depth of the tree.
     """
+    # If we exceeded the max depth, we stop
+    if current_depth > max_depth:
+        return tree
+
     neighbors = list(graph[current_node])
-    path = path if path else []
 
     # If a node has no neighbors, there is nothing to do and this function
     # returns immediately.
     if not neighbors:
         return tree
-
-    # If a node has itself as its only neighbor, then this is a final node, and
-    # we should not recurse (or this will lead to infinite loops. Simple add
-    # its neighbors and return.
-    if neighbors == [current_node]:
-        for _, edge in graph[current_node][current_node].items():
-            received_node = _merge_path_from_label(tree, root, edge["label"])
-        return tree
-
-    # In any other case, follow every edge and recursively merge the rest of
-    # the graph into the tree.
-
-    # Find cycles in this graph, this is used later in the loop, but we only
-    # have to do it once.
-    cycles = list(simple_cycles(graph))
-    print(cycles)
 
     # A node can have multiple neighbors
     for neighbor in neighbors:
@@ -375,47 +213,30 @@ def _merge_subgraph(
         # a different label. Each edge is numbered, but we ignore this
         # number.
         for _, edge in graph[current_node][neighbor].items():
-            # If this node has been encountered before, we have detected a cycle,
-            # where the current node is the start of the cycle. What we do now, is
-            # create a special response message in which we encode this cycle,
-            # add this to the graph and do not recurse (since this would lead
-            # to an infinite loop otherwise.
-            cycle_detected = False
-            postfix = None
-
-            if neighbor in path:
-                print(path)
-                cycle_detected = True
-                cycle = path[path.index(neighbor) :]
-                if current_node != neighbor:
-                    cycle += [current_node]
-                cycle_path = _extract_cycle_path(graph, cycle)
-                postfix = "|" + cycle_path
-
-            received_node = _merge_path_from_label(
-                tree, root, edge["label"], postfix=postfix
-            )
+            received_node = _merge_path_from_label(tree, root, edge["label"])
 
             # If the received message contains 'ConnectionClosed', this
             # path can be stopped here. This greatly reduces the number
             # of redundant nodes, because of 'ConnectionClosed' edges
-            # go the the final node, which always contains many self loops.
+            # go to the final node, which always contains many self loops.
             if "ConnectionClosed" in received_node[-1]:
                 # Do not recurse
                 continue
 
+            # If a node only has itself as a neighbor, this is a sink state and
+            # we do not recurse
+            if neighbors == [current_node]:
+                continue
+
             # Recurse with new root and current node
-            if not cycle_detected:
-                tree = _merge_subgraph(
-                    tree, received_node, graph, neighbor, path + [current_node]
-                )
+            tree = _merge_subgraph(
+                tree, received_node, graph, neighbor, current_depth + 1, max_depth
+            )
 
     return tree
 
 
-def _merge_path_from_label(
-    tree: ModelTree, root: tuple, label: str, postfix: str = None
-) -> tuple:
+def _merge_path_from_label(tree: ModelTree, root: tuple, label: str) -> tuple:
     """Merge a path into the passed tree from a label. The label is assumed to
     have the format "{{ sent }} / {{ received }}", since this is the format
     that StateLearner outputs. The nodes will be added as
@@ -428,7 +249,6 @@ def _merge_path_from_label(
         tree: The path will be added to this graph.
         root: Point in the tree where the nodes will be added.
         label: String of the format "{{ sent }} / {{ received }}"
-        postfix: Optional value that will be added to the received node name.
 
     Returns:
         The name of the "received" node (which is a tuple), so the caller knows
@@ -440,9 +260,6 @@ def _merge_path_from_label(
     sent, received = [
         message.replace('"', "").strip() for message in label.split("/", maxsplit=1)
     ]
-
-    if postfix:
-        received += postfix
 
     # Append the sent and received messages to the tree
     sent_node = root + (sent,)
@@ -465,10 +282,110 @@ def _dot_to_networkx(dot_graph):
     return networkx.drawing.nx_pydot.from_pydot(pydot_graph)
 
 
-def _extract_cycle_path(graph, cycle):
-    cycle = cycle + [cycle[0]]
-    edges = list(zip(cycle, cycle[1:]))
+def construct_tree_from_dedup(directory: str, tree_type: str) -> ModelTree:
+    """Given a directory output from the dedup command, construct a ModelTree.
 
-    # We assume there is only one edge between all the nodes in the cycle
-    labels = [graph[edge[0]][edge[1]][0]["label"] for edge in edges]
-    return "CYCLE({})".format(" -> ".join(labels))
+    Args:
+        directory: The path to the dedup directory
+        tree_type: The desired output tree type, can be any from
+            SUPPORTED_TREE_TYPES.
+    """
+    try:
+        handler = _tree_type_handlers[tree_type]
+    except KeyError:
+        raise ValueError(f"Not a valid tree type: {tree_type}")
+
+    path = Path(directory)
+
+    # Build the tree using the specified tree type handler
+    tree = handler(path)
+
+    # Add the model mapping information to the tree
+    tree.model_mapping = {}
+
+    model_directories = sorted([item for item in path.iterdir() if item.is_dir()])
+    for model_dir in model_directories:
+        with open(model_dir / "versions.json") as f:
+            version_info = json.load(f)
+
+            # Convert to set with tuples and add to model_mapping
+            version_info = {tuple(x) for x in version_info}
+            tree.model_mapping[model_dir.name] = version_info
+
+    return tree
+
+
+def _construct_adg(path: Path) -> ModelTree:
+    """Construct the ADG (output from adg-finder) and add metadata from the
+    dedup directory.
+    """
+    adg_path = path / "adg.gv"
+    with open(adg_path) as f:
+        adg = _dot_to_networkx(f.read())
+    adg_root = [node for node in adg.nodes if adg.in_degree(node) == 0][0]
+
+    tree = ModelTree()
+    tree_root = ()
+    tree.add_node(tree_root)
+
+    return _merge_subadg(tree, tree_root, adg, adg_root)
+
+
+def _merge_subadg(tree, root, adg, current_node):
+    neighbors = list(adg[current_node])
+
+    if not neighbors:
+        node = adg.nodes[current_node]
+
+        # Fix adg-finder output (add brackets, remove quotes, remove "_s0"
+        # suffixes).
+        models = f"[{node['models']}]"
+        models = models.replace('"', "")
+        models = models.replace("_s0", "")
+
+        # Parse as Python list
+        models = ast.literal_eval(models)
+
+        # Add as attribute to node
+        tree.nodes[root]["models"] = set(models)
+
+        return tree
+
+    for neighbor in neighbors:
+        for _, edge in adg[current_node][neighbor].items():
+            label = edge["label"].replace('"', "")
+            new_node = root + (label,)
+
+            tree.add_edge(root, new_node, label=label)
+
+            # Recurse
+            tree = _merge_subadg(tree, new_node, adg, neighbor)
+
+    return tree
+
+
+def _construct_ddg(path: Path) -> ModelTree:
+    """Construct the DDG (dynamic distinguishing graph) from the dedup
+    directory.
+    """
+    tree = ModelTree()
+    tree_root = ()
+    tree.add_node(tree_root)
+
+    model_directories = sorted([item for item in path.iterdir() if item.is_dir()])
+    for model_dir in model_directories:
+        with open(model_dir / "model.gv") as f:
+            graph = normalize_graph(f.read())
+            tree.add_edges_from(graph.edges(data=True))
+            for leaf in graph.leaves:
+                try:
+                    tree.nodes[leaf]["models"].add(model_dir.name)
+                except KeyError:
+                    tree.nodes[leaf]["models"] = {model_dir.name}
+
+    tree.condense()
+    return tree
+
+
+_tree_type_handlers = {"adg": _construct_adg, "ddg": _construct_ddg}
+SUPPORTED_TREE_TYPES = list(_tree_type_handlers.keys())

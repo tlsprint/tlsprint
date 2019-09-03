@@ -21,7 +21,7 @@ def add_resets_edges(graph, start):
 def convert_graph(graph, *, add_resets=False):
     """Convert a graph from LearnLib DOT output to dict, with the structure
     required by adg-finder.
-    """
+    # """
     converted = {}
 
     # The first (and only) state connected to the dummy_start, is the actual

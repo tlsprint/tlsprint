@@ -8,7 +8,7 @@ import pkg_resources
 import click
 from tlsprint import util
 from tlsprint.identify import identify
-from tlsprint.learn import _dot_to_networkx, learn_models
+from tlsprint.learn import _dot_to_networkx, construct_tree_from_dedup
 
 
 @click.group()
@@ -17,12 +17,13 @@ def main():
 
 
 @main.command("learn")
-@click.argument("model_directory", type=click.Path(exists=True))
+@click.argument("dedup_directory", type=click.Path(exists=True))
 @click.argument("output", type=click.File("wb"))
-def learn_command(model_directory, output):
-    """Learn the model tree of all models in the specified directory and write
-    the tree to 'output' as a pickled object."""
-    tree = learn_models(model_directory)
+@click.option("--tree-type", default="adg")
+def learn_command(dedup_directory, output, tree_type):
+    """Learn the distinguishing sequences based on the output of the `dedup`
+    command. Write the resulting tree to 'output' as a pickled object."""
+    tree = construct_tree_from_dedup(dedup_directory, tree_type=tree_type)
     pickle.dump(tree, output)
 
 

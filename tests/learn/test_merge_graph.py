@@ -1,5 +1,5 @@
 import networkx
-from tlsprint.learn import _merge_graph
+from tlsprint.learn import _merge_subgraph
 
 
 def test_end_condition_simple():
@@ -13,8 +13,7 @@ def test_end_condition_simple():
     graph = networkx.DiGraph([("s2", "s2", {0: {"label": "sent / received"}})])
 
     # Merge the graph into the tree
-    servers = ["serverA", "serverB"]
-    tree = _merge_graph(tree, root, graph, "s2", servers)
+    tree = _merge_subgraph(tree, root, graph, "s2", 0, 10)
 
     # Assert that the tree is correct
     sent = ("sent",)
@@ -23,7 +22,6 @@ def test_end_condition_simple():
     assert set(tree.edges) == {(root, sent), (sent, received)}
     assert dict(tree[root][sent]) == {"label": "sent"}
     assert dict(tree[sent][received]) == {"label": "received"}
-    assert tree.nodes[received]["servers"] == set(servers)
 
 
 def test_recursion():
@@ -42,8 +40,7 @@ def test_recursion():
     )
 
     # Merge the graph into the tree
-    servers = ["serverA", "serverB"]
-    tree = _merge_graph(tree, root, graph, "s1", servers)
+    tree = _merge_subgraph(tree, root, graph, "s1", 0, 10)
 
     # Assert that the tree is correct
     sentA = ("sentA",)
@@ -61,4 +58,3 @@ def test_recursion():
     assert dict(tree[sentA][receivedA]) == {"label": "receivedA"}
     assert dict(tree[receivedA][sentB]) == {"label": "sentB"}
     assert dict(tree[sentB][receivedB]) == {"label": "receivedB"}
-    assert tree.nodes[receivedB]["servers"] == set(servers)
