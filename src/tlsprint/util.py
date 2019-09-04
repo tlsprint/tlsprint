@@ -15,7 +15,7 @@ def add_resets_edges(graph, start):
     for node in graph.nodes:
         neighbors = list(graph[node])
         if neighbors == [node]:
-            graph.add_edge(node, start, label="RESET / -")
+            graph.add_edge(node, start, label="RESET / ")
 
 
 def convert_graph(graph, *, add_resets=False):
