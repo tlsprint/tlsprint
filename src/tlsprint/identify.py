@@ -35,6 +35,9 @@ def identify(tree, target, target_port=443, graph_dir=None):
     connector_path = pkg_resources.resource_filename(
         __name__, os.path.join("connector", "TLSAttackerConnector2.0.jar")
     )
+    messages_path = pkg_resources.resource_filename(
+        __name__, os.path.join("connector", "messages")
+    )
     connector_process = subprocess.Popen(
         [
             "java",
@@ -44,6 +47,9 @@ def identify(tree, target, target_port=443, graph_dir=None):
             target,
             "--targetPort",
             str(target_port),
+            "--messageDir",
+            messages_path,
+            "--merge-application",
         ],
         stdout=subprocess.PIPE,
     )
