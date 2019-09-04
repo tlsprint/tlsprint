@@ -151,7 +151,7 @@ def learn_models(directory):
     root = tuple()
     tree.add_node(root)
 
-    # For identical models, store a group name instead of the list and create a
+    # For identical models, store a model name instead of the list and create a
     # mapping between the name and the implementations. This will reduce the
     # size of the tree when drawn, and will no longer cause confusing as to
     # which implementations have the same model. This mapping will be stored in
@@ -183,8 +183,10 @@ class ModelTree(networkx.DiGraph):
         return [node for node in self.nodes if self.out_degree(node) == 0]
 
     @property
-    def groups(self):
-        return {group for leaf in self.leaves for group in self.nodes[leaf]["servers"]}
+    def models(self):
+        return {
+            _models for leaf in self.leaves for _models in self.nodes[leaf]["models"]
+        }
 
     def subtree(self, node):
         """Return the subtree where `node` is the root, as a ModelTree."""
@@ -217,31 +219,31 @@ class ModelTree(networkx.DiGraph):
         for node in redundant_nodes:
             self.remove_node(node)
 
-    def prune_groups(self, groups):
-        """Prune the specified groups from the tree, removing redundant nodes
+    def prune_models(self, models):
+        """Prune the specified models from the tree, removing redundant nodes
         from the tree."""
-        groups = set(groups)
+        models = set(models)
 
         for leaf in self.leaves:
-            # Start by removing the groups from every leaf node
-            self.nodes[leaf]["servers"] -= groups
+            # Start by removing the models from every leaf node
+            self.nodes[leaf]["models"] -= models
 
             # If the set is non empty, we can remove it and also their
             # predecessors if they are only connected to this leaf.
-            if not self.nodes[leaf]["servers"]:
+            if not self.nodes[leaf]["models"]:
                 self.prune_node(leaf)
 
     def condense(self):
         """Make the tree more compact by merging together nodes whose leaves
-        are all the same, and the leaves that contain 100% of the groups in the
-        model."""
-        # Remove leafs that contain 100% of the groups
-        groups = self.groups
+        are all the same, and the leaves that contain 100% of the models in the
+        tree."""
+        # Remove leafs that contain 100% of the models
+        models = self.models
         for leaf in self.leaves:
-            if self.nodes[leaf]["servers"] == groups:
+            if self.nodes[leaf]["models"] == models:
                 self.prune_node(leaf)
 
-        # For each leaf, check if its parent contains other groups. If not,
+        # For each leaf, check if its parent contains other models. If not,
         # merge them together in one node.
         changed = True
         while changed:
@@ -254,14 +256,14 @@ class ModelTree(networkx.DiGraph):
                 two_up = list(self.predecessors(one_up))[0]
 
                 subtree = self.subtree(two_up)
-                groups = self.nodes[leaf]["servers"]
+                models = self.nodes[leaf]["models"]
 
-                if subtree.groups == groups and subtree.out_degree(two_up) == len(
+                if subtree.models == models and subtree.out_degree(two_up) == len(
                     subtree.leaves
                 ):
-                    # List the servers at this root node in the original tree,
+                    # List the models at this root node in the original tree,
                     # and remove the other nodes
-                    self.nodes[two_up]["servers"] = groups
+                    self.nodes[two_up]["models"] = models
                     redundant_nodes = set(subtree.nodes) - {two_up}
                     self.remove_nodes_from(redundant_nodes)
                     changed = True
@@ -280,15 +282,15 @@ class ModelTree(networkx.DiGraph):
             tree: The tree to modify and draw.
             path: The path where to store the DOT file.
         """
-        group_count = len(self.groups)
+        model_count = len(self.models)
 
         # Relabel all the nodes
         for node in self.nodes:
             if self.out_degree(node) == 0:
                 # Leaf node
-                groups = sorted(self.nodes[node]["servers"])
-                group_share = "{:.2f}%".format(100 * len(groups) / group_count)
-                self.nodes[node]["label"] = "\n".join([group_share] + groups)
+                models = sorted(self.nodes[node]["models"])
+                model_share = "{:.2f}%".format(100 * len(models) / model_count)
+                self.nodes[node]["label"] = "\n".join([model_share] + models)
                 self.nodes[node]["shape"] = "rectangle"
             else:
                 # Not a leaf node

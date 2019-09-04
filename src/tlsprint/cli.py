@@ -54,12 +54,12 @@ def identify_command(target, target_port, model, graph_dir):
         tree = pickle.loads(pkg_resources.resource_string(__name__, default_location))
 
     tree.condense()
-    groups = identify(tree, target, target_port, graph_dir)
+    models = identify(tree, target, target_port, graph_dir)
 
-    if groups:
-        group = list(groups)[0]
+    if models:
+        model = list(models)[0]
         click.echo("Target has one of the following implementations:")
-        click.echo("\n".join(sorted(tree.model_mapping[group])))
+        click.echo("\n".join(sorted(tree.model_mapping[model])))
 
 
 @main.command("convert")

@@ -67,7 +67,7 @@ def identify(tree, target, target_port=443, graph_dir=None):
 
         # Pick a random path down the tree
         leaves = tree.leaves
-        groups = tree.groups
+        models = tree.models
         descending = True
         while descending:
             # Pick a random node (message to send)
@@ -93,8 +93,8 @@ def identify(tree, target, target_port=443, graph_dir=None):
                 if graph_dir:
                     tree.draw(graph_dir / "iteration-{}-pre-prune.gv".format(iteration))
 
-                leaf_groups = tree.nodes[response_node]["servers"]
-                tree.prune_groups(groups - leaf_groups)
+                leaf_models = tree.nodes[response_node]["models"]
+                tree.prune_models(models - leaf_models)
 
                 if graph_dir:
                     tree.draw(
@@ -105,17 +105,17 @@ def identify(tree, target, target_port=443, graph_dir=None):
             else:
                 current_node = response_node
 
-        # If 'groups' is empty after condensing, we are done return the groups
+        # If 'models' is empty after condensing, we are done return the models
         # from right before this step
-        groups = tree.groups
+        models = tree.models
         tree.condense()
 
         if graph_dir:
             tree.draw(graph_dir / "iteration-{}-condensed.gv".format(iteration))
 
-        if not tree.groups:
+        if not tree.models:
             connector.close()
-            return groups
+            return models
 
         iteration += 1
 
