@@ -128,3 +128,13 @@ def dedup_command(model_directory, output_directory):
             # Add the version list
             with open(model_dir / "versions.json", "w") as f:
                 json.dump(versions, f, indent=4)
+
+
+@main.command("draw")
+@click.argument("graph", type=click.File("rb"))
+@click.argument("output", type=click.File("wb"))
+@click.option("--format", "fmt", default="svg")
+def daw_command(graph, output, fmt):
+    graph = pickle.load(graph)
+    drawing = graph.draw(fmt=fmt)
+    output.write(drawing)

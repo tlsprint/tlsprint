@@ -269,8 +269,8 @@ class ModelTree(networkx.DiGraph):
                     changed = True
                     break
 
-    def draw(self, path):
-        """Draw this tree by outputting a Graphviz file in DOT format. This
+    def draw(self, fmt="dot"):
+        """Draw this tree using Graphviz in a desired output format. This
         slightly modifies the tree in order to improve the output:
         -   Set the label of all non leafs nodes to blank, as the information
             is already captured by the edges.
@@ -280,7 +280,7 @@ class ModelTree(networkx.DiGraph):
 
         Args:
             tree: The tree to modify and draw.
-            path: The path where to store the DOT file.
+            fmt: Any format supported by Graphviz in which to draw to graph.
         """
         model_count = len(self.models)
 
@@ -295,7 +295,8 @@ class ModelTree(networkx.DiGraph):
             else:
                 # Not a leaf node
                 self.nodes[node]["label"] = ""
-        networkx.drawing.nx_pydot.write_dot(self, path)
+        dot = networkx.drawing.nx_pydot.to_pydot(self)
+        return dot.create(format=fmt)
 
 
 def normalize_graph(dot_graph: str) -> ModelTree:
