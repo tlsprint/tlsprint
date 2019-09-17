@@ -1,9 +1,8 @@
 import json
-import os
 import pickle
+import sys
+from distutils.version import LooseVersion
 from pathlib import Path
-
-import pkg_resources
 
 import click
 from tlsprint import util
@@ -48,19 +47,23 @@ def identify_command(target, target_port, model, graph_dir):
     target. By default this will use the model provided with the distribution,
     but a custom model can be supplied.
     """
-    if model:
-        tree = pickle.load(model)
-    else:
-        default_location = os.path.join("data", "model.p")
-        tree = pickle.loads(pkg_resources.resource_string(__name__, default_location))
+    from tlsprint import trees
 
+    # For now, default to ADG TLS12
+    tree = trees.trees["adg"]["TLS12"]
     tree.condense()
     models = identify(tree, target, target_port, graph_dir)
 
     if models:
         model = list(models)[0]
+        version_info = tree.model_mapping[model]
+        version_info = sorted(version_info, key=lambda x: LooseVersion(x[1]))
+        version_strings = [" ".join(info) for info in version_info]
         click.echo("Target has one of the following implementations:")
-        click.echo("\n".join(sorted(tree.model_mapping[model])))
+        click.echo("\n".join(version_strings))
+    else:
+        click.echo("Failed to identify implementation")
+        sys.exit(1)
 
 
 @main.command("convert")
