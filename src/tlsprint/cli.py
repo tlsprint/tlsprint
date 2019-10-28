@@ -5,7 +5,8 @@ from distutils.version import LooseVersion
 from pathlib import Path
 
 import click
-from tlsprint import util
+import tabulate
+from tlsprint import stats, util
 from tlsprint.identify import identify
 from tlsprint.learn import _dot_to_networkx, construct_tree_from_dedup
 
@@ -142,3 +143,40 @@ def daw_command(graph, output, fmt):
     graph = pickle.load(graph)
     drawing = graph.draw(fmt=fmt)
     output.write(drawing)
+
+
+@main.command("stats")
+@click.option(
+    "--type",
+    "stats_type",
+    multiple=True,
+    type=click.Choice(stats.TYPES),
+    help="Stats type to print.",
+)
+@click.option(
+    "--model-directory",
+    default="models/models",
+    type=click.Path(exists=True),
+    help="Directory where the models are stored.",
+)
+@click.option(
+    "--dedup-directory",
+    default="dedup",
+    type=click.Path(exists=True),
+    help="Directory where the deduplicated model are stored.",
+)
+@click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
+def stats_command(stats_type, model_directory, dedup_directory, fmt):
+    """Provide statistics about the available models (number of
+    implementations, unique models, etc.).
+    """
+    for type_ in stats_type:
+        summary = stats.TYPE_HANDLERS[type_](
+            models_dir=model_directory, dedup_dir=dedup_directory
+        )
+
+        if fmt == "table":
+            click.echo(tabulate.tabulate(summary, headers="keys"))
+        else:
+            click.echo(json.dumps(summary))
+        click.echo()
