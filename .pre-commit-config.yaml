@@ -12,3 +12,5 @@ repos:
     rev: master
     hooks:
       - id: isort
+        additional_dependencies:
+          - toml
