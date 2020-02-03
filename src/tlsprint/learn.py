@@ -13,7 +13,7 @@ from networkx.algorithms.traversal.depth_first_search import dfs_tree
 
 
 class ModelTree(networkx.DiGraph):
-    """Data structure to store an ADG or DDG created from LearnLib models."""
+    """Data structure to store an ADG or HDT created from LearnLib models."""
 
     @property
     def leaves(self):
@@ -364,8 +364,8 @@ def _merge_subadg(tree, root, adg, current_node):
     return tree
 
 
-def _construct_ddg(path: Path) -> ModelTree:
-    """Construct the DDG (dynamic distinguishing graph) from the dedup
+def _construct_hdt(path: Path) -> ModelTree:
+    """Construct the HDT (heuristic decision tree) from the dedup
     directory.
     """
     tree = ModelTree()
@@ -387,5 +387,5 @@ def _construct_ddg(path: Path) -> ModelTree:
     return tree
 
 
-_tree_type_handlers = {"adg": _construct_adg, "ddg": _construct_ddg}
+_tree_type_handlers = {"adg": _construct_adg, "hdt": _construct_hdt}
 SUPPORTED_TREE_TYPES = list(_tree_type_handlers.keys())

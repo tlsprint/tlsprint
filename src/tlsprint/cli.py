@@ -8,7 +8,11 @@ import click
 import tabulate
 from tlsprint import stats, util
 from tlsprint.identify import identify
-from tlsprint.learn import _dot_to_networkx, construct_tree_from_dedup
+from tlsprint.learn import (
+    SUPPORTED_TREE_TYPES,
+    _dot_to_networkx,
+    construct_tree_from_dedup,
+)
 
 
 @click.group()
@@ -19,7 +23,7 @@ def main():
 @main.command("learn")
 @click.argument("dedup_directory", type=click.Path(exists=True))
 @click.argument("output", type=click.File("wb"))
-@click.option("--tree-type", default="adg")
+@click.option("--tree-type", default="adg", type=click.Choice(SUPPORTED_TREE_TYPES))
 def learn_command(dedup_directory, output, tree_type):
     """Learn the distinguishing sequences based on the output of the `dedup`
     command. Write the resulting tree to 'output' as a pickled object."""
