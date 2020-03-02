@@ -117,6 +117,35 @@ class TLSAttackerConnector(AbastractConnector):
         self.socket.sendall((message + "\n").encode())
         return self.socket.recv(bufsize).decode().strip()
 
+    def reset(self):
+        self.send("RESET")
+
+
+class BenchmarkConnector(AbastractConnector):
+    def __init__(self, target, tree):
+        self.target = target
+        self.tree = tree
+
+        # Initialize a list to keep track of the messages send and received
+        self.messages = []
+        self.current_node = ()
+
+    def send(self, message):
+        self.messages.append(message)
+        self.current_node += (message,)
+
+        neighbors = self.tree[self.current_node]
+        for neighbor in neighbors:
+            if self.target in self.tree.subtree(neighbor).models:
+                output = neighbor[-1]
+                self.messages.append(output)
+                self.current_node += (output,)
+                return output
+
+    def reset(self):
+        self.messages += ["RESET", ""]
+        self.current_node = ()
+
 
 def identify(
     tree,
@@ -131,14 +160,14 @@ def identify(
         graph_dir = pathlib.Path(graph_dir)
         graph_dir.mkdir(exist_ok=True)
 
-    connector = TLSAttackerConnector(target, target_port)
+    if benchmark:
+        connector = BenchmarkConnector(target, tree)
+    else:
+        connector = TLSAttackerConnector(target, target_port)
 
     identifing = True
     iteration = 1
     while identifing:
-
-        # Reset TLSAttackerConnector
-        connector.send("RESET")
 
         # Descent to a leaf node
         leaf_node = connector.descent(tree, selector, graph_dir=graph_dir)
@@ -152,22 +181,41 @@ def identify(
         # Log the node, color it and draw the graph
         if graph_dir:
             tree.nodes[leaf_node]["color"] = "red"
-            tree.draw(graph_dir / "iteration-{}-pre-prune.gv".format(iteration))
-
-        # If there is only one model left in the leaf node, we have a result.
-        leaf_models = tree.nodes[leaf_node]["models"]
-        if len(leaf_models) == 1:
-            connector.close()
-            return leaf_models
+            tree.draw(
+                path=graph_dir / "iteration-{}-pre-prune.svg".format(iteration),
+                fmt="svg",
+            )
 
         # Prune the tree
+        leaf_models = tree.nodes[leaf_node]["models"]
         tree.prune_models(tree.models - leaf_models)
 
         if graph_dir:
-            tree.draw(graph_dir / "iteration-{}-post-prune.gv".format(iteration))
+            tree.draw(
+                path=graph_dir / "iteration-{}-post-prune.svg".format(iteration),
+                fmt="svg",
+            )
 
         # Condense the tree
         tree.condense()
 
+        # If the tree is empty after condensing, the result was one of the
+        # models in the last leaf node. This can be more then one model, as
+        # some might not be distinguishable.
+        if len(tree) == 0:
+            connector.close()
+            if benchmark:
+                return connector.messages
+            else:
+                return leaf_models
+
         if graph_dir:
-            tree.draw(graph_dir / "iteration-{}-condensed.gv".format(iteration))
+            tree.draw(
+                path=graph_dir / "iteration-{}-condensed.svg".format(iteration),
+                fmt="svg",
+            )
+
+        iteration += 1
+
+        # Reset TLSAttackerConnector
+        connector.reset()
