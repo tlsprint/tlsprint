@@ -35,10 +35,10 @@ def learn_command(dedup_directory, output, tree_type):
 @click.argument("target")
 @click.option("-p", "--target-port", default=443)
 @click.option(
-    "--model",
+    "--tree",
     help=(
-        "Optional custom model to use (output from `learn`),"
-        " defaults to model included in the distribution."
+        "Optional custom tree to use (output from `learn`),"
+        " defaults to tree included in the distribution."
     ),
     type=click.File("rb"),
 )
@@ -47,15 +47,19 @@ def learn_command(dedup_directory, output, tree_type):
     help="Directory to store intermediate graphs, if desired.",
     type=click.Path(file_okay=False, writable=True),
 )
-def identify_command(target, target_port, model, graph_dir):
-    """Uses the learned model to identify the implementation running on the
-    target. By default this will use the model provided with the distribution,
-    but a custom model can be supplied.
+def identify_command(target, target_port, tree, graph_dir):
+    """Uses the learned tree to identify the implementation running on the
+    target. By default this will use the tree provided with the distribution,
+    but a custom tree can be supplied.
     """
     from tlsprint import trees
 
-    # For now, default to ADG TLS12
-    tree = trees.trees["adg"]["TLS12"]
+    if not tree:
+        # For now, default to ADG TLS12
+        tree = trees.trees["adg"]["TLS12"]
+    else:
+        tree = pickle.load(tree)
+
     tree.condense()
     models = identify(tree, target, target_port, graph_dir)
 
