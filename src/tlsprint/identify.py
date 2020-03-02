@@ -1,5 +1,6 @@
 """Identification components, to be used after learning the model tree."""
 
+import abc
 import os
 import pathlib
 import random
@@ -9,7 +10,47 @@ import subprocess
 import pkg_resources
 
 
-class TLSAttackerConnector:
+class AbastractConnector(abc.ABC):
+    def close(self):
+        pass
+
+    @abc.abstractmethod
+    def send(self, message):
+        pass
+
+    def descent(self, tree, graph_dir=None):
+        """Descent the tree until a leaf node is reached."""
+        # Start at the root of the tree
+        current_node = tuple()
+
+        leaves = tree.leaves
+        descending = True
+        while descending:
+            # Pick a random node (message to send)
+            send_node = random.choice(list(tree[current_node]))
+
+            # Send this message and read the response
+            response = self.send(send_node[-1])
+
+            # Check if this leads to an existing node, and if this node is a
+            # leaf node.
+            response_node = send_node + (response,)
+            try:
+                tree[response_node]
+            except KeyError:
+                print("No model with this path:")
+                print(response_node)
+                return
+
+            if response_node in leaves:
+                descending = False
+            else:
+                current_node = response_node
+
+        return response_node
+
+
+class TLSAttackerConnector(AbastractConnector):
     def __init__(self, target, target_port=443):
         """Start TLSAttackerConnector. Returns a handler to both the process and
         the socket"""
@@ -63,7 +104,7 @@ class TLSAttackerConnector:
         return self.socket.recv(bufsize).decode().strip()
 
 
-def identify(tree, target, target_port=443, graph_dir=None):
+def identify(tree, target, target_port=443, graph_dir=None, benchmark=False):
     # Create output directory if required
     if graph_dir:
         graph_dir = pathlib.Path(graph_dir)
@@ -78,62 +119,34 @@ def identify(tree, target, target_port=443, graph_dir=None):
         # Reset TLSAttackerConnector
         connector.send("RESET")
 
-        # Start at the root of the tree
-        current_node = tuple()
+        # Descent to a leaf node
+        leaf_node = connector.descent(tree, graph_dir)
 
-        # Pick a random path down the tree
-        leaves = tree.leaves
-        models = tree.models
-        descending = True
-        while descending:
-            # Pick a random node (message to send)
-            send_node = random.choice(list(tree[current_node]))
+        # If the descent does not return a leaf node, there is no model
+        # matched.
+        if not leaf_node:
+            connector.close()
+            return
 
-            # Send this message and read the response
-            response = connector.send(send_node[-1])
+        # Log the node, color it and draw the graph
+        if graph_dir:
+            tree.nodes[leaf_node]["color"] = "red"
+            tree.draw(graph_dir / "iteration-{}-pre-prune.gv".format(iteration))
 
-            # Check if this leads to an existing node, and if this node is a
-            # leaf node.
-            response_node = send_node + (response,)
-            try:
-                tree[response_node]
-            except KeyError:
-                print("No model with this path:")
-                print(response_node)
-                return
+        # If there is only one model left in the leaf node, we have a result.
+        leaf_models = tree.nodes[leaf_node]["models"]
+        if len(leaf_models) == 1:
+            connector.close()
+            return leaf_models
 
-            if response_node in leaves:
-                # Log the node, color it and draw the graph
-                tree.nodes[response_node]["color"] = "red"
+        # Prune the tree
+        tree.prune_models(tree.models - leaf_models)
 
-                if graph_dir:
-                    tree.draw(graph_dir / "iteration-{}-pre-prune.gv".format(iteration))
+        if graph_dir:
+            tree.draw(graph_dir / "iteration-{}-post-prune.gv".format(iteration))
 
-                leaf_models = tree.nodes[response_node]["models"]
-                tree.prune_models(models - leaf_models)
-
-                if graph_dir:
-                    tree.draw(
-                        graph_dir / "iteration-{}-post-prune.gv".format(iteration)
-                    )
-
-                descending = False
-            else:
-                current_node = response_node
-
-        # If 'models' is empty after condensing, we are done return the models
-        # from right before this step
-        models = tree.models
+        # Condense the tree
         tree.condense()
 
         if graph_dir:
             tree.draw(graph_dir / "iteration-{}-condensed.gv".format(iteration))
-
-        if not tree.models:
-            connector.close()
-            return models
-
-        iteration += 1
-
-    # Close the socket and ensure the process is terminated
-    connector.close()
