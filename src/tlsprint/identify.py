@@ -9,20 +9,58 @@ import subprocess
 import pkg_resources
 
 
-def probe(connector, message):
-    """Send the message to TLSAttackerConnector and return the result.
+class TLSAttackerConnector:
+    def __init__(self, target, target_port=443):
+        """Start TLSAttackerConnector. Returns a handler to both the process and
+        the socket"""
+        connector_path = pkg_resources.resource_filename(
+            __name__, os.path.join("connector", "TLSAttackerConnector2.0.jar")
+        )
+        messages_path = pkg_resources.resource_filename(
+            __name__, os.path.join("connector", "messages")
+        )
 
-    This function does a few things:
-        - Append a newline to the message
-        - Encode the message
-        - Decodes the resulting response
-        - Strips the response of the trailing newline
-    """
-    # TLSAttackerConnector will never be larger than this, but something more
-    # robust is desirable.
-    bufsize = 1024
-    connector.sendall((message + "\n").encode())
-    return connector.recv(bufsize).decode().strip()
+        self.process = subprocess.Popen(
+            [
+                "java",
+                "-jar",
+                connector_path,
+                "--targetHost",
+                target,
+                "--targetPort",
+                str(target_port),
+                "--messageDir",
+                messages_path,
+                "--merge-application",
+            ],
+            stdout=subprocess.PIPE,
+        )
+
+        # Wait until the first line to stdout is written, this means the connector
+        # is initialized.
+        self.process.stdout.readline()
+
+        # Connect to the connector socket
+        self.socket = socket.create_connection(("localhost", 6666))
+
+    def close(self):
+        self.socket.close()
+        self.process.terminate()
+
+    def send(self, message):
+        """Send the message to TLSAttackerConnector and return the result.
+
+        This function does a few things:
+            - Append a newline to the message
+            - Encode the message
+            - Decodes the resulting response
+            - Strips the response of the trailing newline
+        """
+        # TLSAttackerConnector will never be larger than this, but something more
+        # robust is desirable.
+        bufsize = 1024
+        self.socket.sendall((message + "\n").encode())
+        return self.socket.recv(bufsize).decode().strip()
 
 
 def identify(tree, target, target_port=443, graph_dir=None):
@@ -31,42 +69,14 @@ def identify(tree, target, target_port=443, graph_dir=None):
         graph_dir = pathlib.Path(graph_dir)
         graph_dir.mkdir(exist_ok=True)
 
-    # Start TLSAttackerConnector
-    connector_path = pkg_resources.resource_filename(
-        __name__, os.path.join("connector", "TLSAttackerConnector2.0.jar")
-    )
-    messages_path = pkg_resources.resource_filename(
-        __name__, os.path.join("connector", "messages")
-    )
-    connector_process = subprocess.Popen(
-        [
-            "java",
-            "-jar",
-            connector_path,
-            "--targetHost",
-            target,
-            "--targetPort",
-            str(target_port),
-            "--messageDir",
-            messages_path,
-            "--merge-application",
-        ],
-        stdout=subprocess.PIPE,
-    )
-
-    # Wait until the first line to stdout is written, this means the connector
-    # is initialized.
-    connector_process.stdout.readline()
-
-    # Connect to the connector socket
-    connector = socket.create_connection(("localhost", 6666))
+    connector = TLSAttackerConnector(target, target_port)
 
     identifing = True
     iteration = 1
     while identifing:
 
         # Reset TLSAttackerConnector
-        probe(connector, "RESET")
+        connector.send("RESET")
 
         # Start at the root of the tree
         current_node = tuple()
@@ -80,7 +90,7 @@ def identify(tree, target, target_port=443, graph_dir=None):
             send_node = random.choice(list(tree[current_node]))
 
             # Send this message and read the response
-            response = probe(connector, send_node[-1])
+            response = connector.send(send_node[-1])
 
             # Check if this leads to an existing node, and if this node is a
             # leaf node.
@@ -127,4 +137,3 @@ def identify(tree, target, target_port=443, graph_dir=None):
 
     # Close the socket and ensure the process is terminated
     connector.close()
-    connector_process.terminate()
