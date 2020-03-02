@@ -10,6 +10,20 @@ import subprocess
 import pkg_resources
 
 
+def random_selector(tree, current_node):
+    return random.choice(list(tree[current_node]))
+
+
+def always_first_selector(tree, current_node):
+    return list(tree[current_node])[0]
+
+
+INPUT_SELECTORS = {
+    "random": random_selector,
+    "first": always_first_selector,
+}
+
+
 class AbastractConnector(abc.ABC):
     def close(self):
         pass
@@ -18,7 +32,7 @@ class AbastractConnector(abc.ABC):
     def send(self, message):
         pass
 
-    def descent(self, tree, graph_dir=None):
+    def descent(self, tree, selector, graph_dir=None):
         """Descent the tree until a leaf node is reached."""
         # Start at the root of the tree
         current_node = tuple()
@@ -27,7 +41,7 @@ class AbastractConnector(abc.ABC):
         descending = True
         while descending:
             # Pick a random node (message to send)
-            send_node = random.choice(list(tree[current_node]))
+            send_node = selector(tree, current_node)
 
             # Send this message and read the response
             response = self.send(send_node[-1])
@@ -104,7 +118,14 @@ class TLSAttackerConnector(AbastractConnector):
         return self.socket.recv(bufsize).decode().strip()
 
 
-def identify(tree, target, target_port=443, graph_dir=None, benchmark=False):
+def identify(
+    tree,
+    target,
+    target_port=443,
+    graph_dir=None,
+    selector=always_first_selector,
+    benchmark=False,
+):
     # Create output directory if required
     if graph_dir:
         graph_dir = pathlib.Path(graph_dir)
@@ -120,7 +141,7 @@ def identify(tree, target, target_port=443, graph_dir=None, benchmark=False):
         connector.send("RESET")
 
         # Descent to a leaf node
-        leaf_node = connector.descent(tree, graph_dir)
+        leaf_node = connector.descent(tree, selector, graph_dir=graph_dir)
 
         # If the descent does not return a leaf node, there is no model
         # matched.
