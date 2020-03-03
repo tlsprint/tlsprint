@@ -1,4 +1,3 @@
-import copy
 import json
 import pickle
 import sys
@@ -8,7 +7,8 @@ from pathlib import Path
 import click
 import tabulate
 from tlsprint import stats, util
-from tlsprint.identify import INPUT_SELECTORS, identify
+from tlsprint.benchmark import benchmark_all
+from tlsprint.identify import identify
 from tlsprint.learn import (
     SUPPORTED_TREE_TYPES,
     _dot_to_networkx,
@@ -193,17 +193,5 @@ def stats_command(stats_type, model_directory, dedup_directory, fmt):
 
 @main.command("benchmark")
 def benchmark_command():
-    from tlsprint.trees import trees
-
-    for tree_type, tls_trees in sorted(trees.items()):
-        for version, tree in sorted(tls_trees.items()):
-
-            models = tree.models
-            number_of_inputs = []
-            for model in sorted(models):
-                tree_copy = copy.deepcopy(tree)
-                path = identify(
-                    tree_copy, model, benchmark=True, selector=INPUT_SELECTORS["random"]
-                )
-                number_of_inputs.append(len(path) / 2)
-            print(tree_type, version, sum(number_of_inputs) / len(number_of_inputs))
+    results = benchmark_all()
+    print(json.dumps(results, indent=4))
