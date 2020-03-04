@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 import tabulate
 from tlsprint import stats, util
-from tlsprint.benchmark import benchmark_all
+from tlsprint.benchmark import benchmark_all, visualize_all
 from tlsprint.identify import identify
 from tlsprint.learn import (
     SUPPORTED_TREE_TYPES,
@@ -191,7 +191,20 @@ def stats_command(stats_type, model_directory, dedup_directory, fmt):
         click.echo()
 
 
-@main.command("benchmark")
-def benchmark_command():
+@main.group("benchmark")
+def benchmark_group():
+    pass
+
+
+@benchmark_group.command("generate")
+@click.argument("output", type=click.File("w"))
+def benchmark_generate_command(output):
     results = benchmark_all()
-    print(json.dumps(results, indent=4))
+    json.dump(results, output, indent=4)
+
+
+@benchmark_group.command("visualize")
+@click.argument("benchmark_file", type=click.File("r"))
+@click.argument("output_directory", type=click.Path())
+def benchmark_visualize_command(benchmark_file, output_directory):
+    visualize_all(json.load(benchmark_file), output_directory)
