@@ -1,6 +1,7 @@
 """Identification components, to be used after learning the model tree."""
 
 import abc
+import operator
 import os
 import pathlib
 import random
@@ -8,6 +9,11 @@ import socket
 import subprocess
 
 import pkg_resources
+
+
+def _tree_weight(tree, model_mapping):
+    return sum([len(model_mapping[model]) for model in tree.models])
+    # return len(tree.models)
 
 
 def random_selector(tree, current_node):
@@ -18,9 +24,28 @@ def always_first_selector(tree, current_node):
     return list(tree[current_node])[0]
 
 
+def gini_selector(tree, current_node):
+    """Use the Gini Impurity to compute with inputs leads to the most
+    distinguishing outputs.
+    More information here: https://en.wikipedia.org/wiki/Decision_tree_learning#Metrics
+    """
+    total_weight = _tree_weight(tree.subtree(current_node), tree.model_mapping)
+    input_info = [{"node": node} for node in tree[current_node]]
+    for info in input_info:
+        output_nodes = list(tree[info["node"]])
+        weights = [
+            _tree_weight(tree.subtree(output_node), tree.model_mapping)
+            for output_node in output_nodes
+        ]
+        info["gini"] = 1 - sum([(x / total_weight) ** 2 for x in weights])
+
+    return max(input_info, key=operator.itemgetter("gini"))["node"]
+
+
 INPUT_SELECTORS = {
     "random": random_selector,
     "first": always_first_selector,
+    "gini": gini_selector,
 }
 
 

@@ -13,9 +13,7 @@ def benchmark(tree, selector=INPUT_SELECTORS["first"]):
     results = []
     for model in sorted(models):
         tree_copy = copy.deepcopy(tree)
-        path = identify(
-            tree_copy, model, benchmark=True, selector=INPUT_SELECTORS["first"]
-        )
+        path = identify(tree_copy, model, benchmark=True, selector=selector)
         results.append(
             {
                 "model": model,
@@ -62,14 +60,15 @@ def benchmark_all():
     return results
 
 
-def _plot_histogram(data):
-    binwidth = 1
+def _plot_histogram(data, tree_type, tls_version, selector, output_path, bins=None):
     mean = sum(data) / len(data)
-    pyplot.hist(data, bins=range(min(data), max(data) + binwidth, binwidth))
+    pyplot.hist(data, bins=bins)
     pyplot.axvline(mean, color="red")
+    pyplot.savefig(output_path)
+    pyplot.clf()
 
 
-def visualize(tree_type, tls_version, selector, benchmark, output_directory):
+def visualize(tree_type, tls_version, selector, benchmark, output_directory, bins=None):
     output_directory = pathlib.Path(output_directory)
     output_directory.mkdir(exist_ok=True)
     base_file_name = f"{tree_type}-{tls_version}-{selector}"
@@ -77,9 +76,8 @@ def visualize(tree_type, tls_version, selector, benchmark, output_directory):
     # Generate a histogram of the number of input messages for each model
     input_counts = [len(model["path"]) // 2 for model in benchmark]
 
-    _plot_histogram(input_counts)
-    pyplot.savefig(output_directory / (base_file_name + "-models.pdf"))
-    pyplot.clf()
+    output_path = output_directory / (base_file_name + "-models.pdf")
+    _plot_histogram(input_counts, tree_type, tls_version, selector, output_path, bins)
 
     # Generate a histogram of the number of input messages for each
     # implementation
@@ -88,12 +86,20 @@ def visualize(tree_type, tls_version, selector, benchmark, output_directory):
     for inputs, implementations in zip(input_counts, implementation_counts):
         inputs_per_implementation += [inputs] * implementations
 
-    _plot_histogram(inputs_per_implementation)
-    pyplot.savefig(output_directory / (base_file_name + "-implementations.pdf"))
-    pyplot.clf()
+    output_path = output_directory / (base_file_name + "-implementations.pdf")
+    _plot_histogram(
+        inputs_per_implementation, tree_type, tls_version, selector, output_path, bins
+    )
 
 
 def visualize_all(benchmark_data, output_directory):
+    # Determine the bin range for to histogram, for more easily comparing the
+    # different plots.
+    input_counts = []
+    for entry in benchmark_data:
+        input_counts += [len(model["path"]) // 2 for model in entry["benchmark"]]
+    bins = range(min(input_counts), max(input_counts) + 1)
+
     for entry in benchmark_data:
         visualize(
             entry["type"],
@@ -101,4 +107,5 @@ def visualize_all(benchmark_data, output_directory):
             entry["selector"],
             entry["benchmark"],
             output_directory,
+            bins=bins,
         )
