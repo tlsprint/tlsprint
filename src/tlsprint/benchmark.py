@@ -1,6 +1,9 @@
+import collections
 import copy
 import pathlib
 
+import pandas
+import seaborn
 from matplotlib import pyplot
 from tlsprint.identify import INPUT_SELECTORS, identify
 from tlsprint.trees import trees
@@ -60,52 +63,57 @@ def benchmark_all():
     return results
 
 
-def _plot_histogram(data, tree_type, tls_version, selector, output_path, bins=None):
-    mean = sum(data) / len(data)
-    pyplot.hist(data, bins=bins)
-    pyplot.axvline(mean, color="red")
+def count_inputs(model_info):
+    return len(model_info["path"]) // 2
+
+
+def equal_model_weight(model_info):
+    return 1
+
+
+def implementation_count_weight(model_info):
+    return len(model_info["implementations"])
+
+
+def visualize_tls_group(benchmark_data, output_directory, title, weight_function):
+    output_path = output_directory / f"{title}.pdf"
+    pyplot.title(title)
+
+    data = pandas.DataFrame()
+    for entry in benchmark_data:
+        model_values = [count_inputs(model) for model in entry["benchmark"]]
+        model_weights = [weight_function(model) for model in entry["benchmark"]]
+        for value, weight in zip(model_values, model_weights):
+            if entry["type"].lower() == "adg":
+                name = entry["type"].upper()
+            else:
+                name = f"{entry['type'].upper()} {entry['selector']}"
+            for value, weight in zip(model_values, model_weights):
+                data = data.append(
+                    [{"name": name, "value": value,} for _ in range(weight)],
+                    ignore_index=True,
+                )
+
+    output_path = output_directory / f"{title}.pdf"
+    seaborn.violinplot(x="name", y="value", data=data, showmeans=True)
     pyplot.savefig(output_path)
     pyplot.clf()
 
 
-def visualize(tree_type, tls_version, selector, benchmark, output_directory, bins=None):
+def visualize_all(benchmark_data, output_directory):
     output_directory = pathlib.Path(output_directory)
     output_directory.mkdir(exist_ok=True)
-    base_file_name = f"{tree_type}-{tls_version}-{selector}"
 
-    # Generate a histogram of the number of input messages for each model
-    input_counts = [len(model["path"]) // 2 for model in benchmark]
-
-    output_path = output_directory / (base_file_name + "-models.pdf")
-    _plot_histogram(input_counts, tree_type, tls_version, selector, output_path, bins)
-
-    # Generate a histogram of the number of input messages for each
-    # implementation
-    implementation_counts = [len(model["implementations"]) for model in benchmark]
-    inputs_per_implementation = []
-    for inputs, implementations in zip(input_counts, implementation_counts):
-        inputs_per_implementation += [inputs] * implementations
-
-    output_path = output_directory / (base_file_name + "-implementations.pdf")
-    _plot_histogram(
-        inputs_per_implementation, tree_type, tls_version, selector, output_path, bins
-    )
-
-
-def visualize_all(benchmark_data, output_directory):
-    # Determine the bin range for to histogram, for more easily comparing the
-    # different plots.
-    input_counts = []
+    # Group by TLS version
+    grouped_by_tls = collections.defaultdict(list)
     for entry in benchmark_data:
-        input_counts += [len(model["path"]) // 2 for model in entry["benchmark"]]
-    bins = range(min(input_counts), max(input_counts) + 1)
+        grouped_by_tls[entry["version"]].append(entry)
 
-    for entry in benchmark_data:
-        visualize(
-            entry["type"],
-            entry["version"],
-            entry["selector"],
-            entry["benchmark"],
-            output_directory,
-            bins=bins,
-        )
+    for tls_version, entries in grouped_by_tls.items():
+        for name, weight_function in (
+            ("models", equal_model_weight),
+            ("implementations", implementation_count_weight),
+        ):
+            visualize_tls_group(
+                entries, output_directory, f"{tls_version} {name}", weight_function
+            )
