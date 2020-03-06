@@ -1,6 +1,7 @@
 """Identification components, to be used after learning the model tree."""
 
 import abc
+import math
 import operator
 import os
 import pathlib
@@ -37,15 +38,36 @@ def gini_selector(tree, current_node):
             _tree_weight(tree.subtree(output_node), tree.model_mapping)
             for output_node in output_nodes
         ]
-        info["gini"] = 1 - sum([(x / total_weight) ** 2 for x in weights])
+        info["metric"] = 1 - sum([(x / total_weight) ** 2 for x in weights])
 
-    return max(input_info, key=operator.itemgetter("gini"))["node"]
+    return max(input_info, key=operator.itemgetter("metric"))["node"]
+
+
+def entropy_selector(tree, current_node):
+    """Use the Information Gain, based on entropy, to compute with inputs leads
+    to the most distinguishing outputs.
+    More information here: https://en.wikipedia.org/wiki/Decision_tree_learning#Metrics
+    """
+    total_weight = _tree_weight(tree.subtree(current_node), tree.model_mapping)
+    input_info = [{"node": node} for node in tree[current_node]]
+    for info in input_info:
+        output_nodes = list(tree[info["node"]])
+        weights = [
+            _tree_weight(tree.subtree(output_node), tree.model_mapping)
+            for output_node in output_nodes
+        ]
+        info["metric"] = -1 * sum(
+            [(x / total_weight) * math.log(x / total_weight) for x in weights]
+        )
+
+    return max(input_info, key=operator.itemgetter("metric"))["node"]
 
 
 INPUT_SELECTORS = {
     "random": random_selector,
     "first": always_first_selector,
     "gini": gini_selector,
+    "entropy": entropy_selector,
 }
 
 
