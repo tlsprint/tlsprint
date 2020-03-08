@@ -12,30 +12,45 @@ import subprocess
 import pkg_resources
 
 
-def _tree_weight(tree, model_mapping):
-    return sum([len(model_mapping[model]) for model in tree.models])
-    # return len(tree.models)
+def _tree_weight(tree, model_mapping, weight_function):
+    return sum([weight_function(model_mapping[model]) for model in tree.models])
 
 
-def random_selector(tree, current_node):
+def equal_model_weight(_):
+    return 1
+
+
+def implementation_count_model_weight(implementations):
+    return len(implementations)
+
+
+MODEL_WEIGHTS = {
+    "equal": equal_model_weight,
+    "count": implementation_count_model_weight,
+}
+
+
+def random_selector(tree, current_node, weight_function):
     return random.choice(list(tree[current_node]))
 
 
-def always_first_selector(tree, current_node):
+def always_first_selector(tree, current_node, weight_function):
     return list(tree[current_node])[0]
 
 
-def gini_selector(tree, current_node):
+def gini_selector(tree, current_node, weight_function):
     """Use the Gini Impurity to compute with inputs leads to the most
     distinguishing outputs.
     More information here: https://en.wikipedia.org/wiki/Decision_tree_learning#Metrics
     """
-    total_weight = _tree_weight(tree.subtree(current_node), tree.model_mapping)
+    total_weight = _tree_weight(
+        tree.subtree(current_node), tree.model_mapping, weight_function
+    )
     input_info = [{"node": node} for node in tree[current_node]]
     for info in input_info:
         output_nodes = list(tree[info["node"]])
         weights = [
-            _tree_weight(tree.subtree(output_node), tree.model_mapping)
+            _tree_weight(tree.subtree(output_node), tree.model_mapping, weight_function)
             for output_node in output_nodes
         ]
         info["metric"] = 1 - sum([(x / total_weight) ** 2 for x in weights])
@@ -43,17 +58,19 @@ def gini_selector(tree, current_node):
     return max(input_info, key=operator.itemgetter("metric"))["node"]
 
 
-def entropy_selector(tree, current_node):
+def entropy_selector(tree, current_node, weight_function):
     """Use the Information Gain, based on entropy, to compute with inputs leads
     to the most distinguishing outputs.
     More information here: https://en.wikipedia.org/wiki/Decision_tree_learning#Metrics
     """
-    total_weight = _tree_weight(tree.subtree(current_node), tree.model_mapping)
+    total_weight = _tree_weight(
+        tree.subtree(current_node), tree.model_mapping, weight_function
+    )
     input_info = [{"node": node} for node in tree[current_node]]
     for info in input_info:
         output_nodes = list(tree[info["node"]])
         weights = [
-            _tree_weight(tree.subtree(output_node), tree.model_mapping)
+            _tree_weight(tree.subtree(output_node), tree.model_mapping, weight_function)
             for output_node in output_nodes
         ]
         info["metric"] = -1 * sum(
@@ -79,7 +96,7 @@ class AbastractConnector(abc.ABC):
     def send(self, message):
         pass
 
-    def descent(self, tree, selector, graph_dir=None):
+    def descent(self, tree, selector, weight_function, graph_dir=None):
         """Descent the tree until a leaf node is reached."""
         # Start at the root of the tree
         current_node = tuple()
@@ -88,7 +105,7 @@ class AbastractConnector(abc.ABC):
         descending = True
         while descending:
             # Pick a random node (message to send)
-            send_node = selector(tree, current_node)
+            send_node = selector(tree, current_node, weight_function)
 
             # Send this message and read the response
             response = self.send(send_node[-1])
@@ -200,6 +217,7 @@ def identify(
     target_port=443,
     graph_dir=None,
     selector=always_first_selector,
+    weight_function=equal_model_weight,
     benchmark=False,
 ):
     # Create output directory if required
@@ -217,7 +235,9 @@ def identify(
     while identifing:
 
         # Descent to a leaf node
-        leaf_node = connector.descent(tree, selector, graph_dir=graph_dir)
+        leaf_node = connector.descent(
+            tree, selector, weight_function, graph_dir=graph_dir
+        )
 
         # If the descent does not return a leaf node, there is no model
         # matched.
