@@ -130,9 +130,6 @@ def visualize(benchmark_data, output_directory, version, weight_function):
     file_name = f"{version} {weight_function}.pdf"
     output_path = output_directory / file_name
 
-    title = f"{version_string}, model weight: {weight_function}"
-    pyplot.title(title)
-
     data = pandas.DataFrame()
     for entry in benchmark_data:
         name = f"{entry['type'].upper()}"
@@ -170,7 +167,11 @@ def visualize(benchmark_data, output_directory, version, weight_function):
         capsize=0.1,
         legend=False,
     )
-    seaborn
+
+    title = f"{version_string} - Model weight: {weight_function.capitalize()}"
+    pyplot.title(title)
+    pyplot.xlabel("Identification method")
+    pyplot.ylabel("Metric value")
     pyplot.savefig(output_path)
     pyplot.clf()
 

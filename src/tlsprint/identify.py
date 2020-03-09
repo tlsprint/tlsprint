@@ -8,6 +8,7 @@ import pathlib
 import random
 import socket
 import subprocess
+from distutils.version import LooseVersion
 
 import pkg_resources
 
@@ -24,9 +25,37 @@ def implementation_count_model_weight(implementations):
     return len(implementations)
 
 
+def recent_implementation_model_weight(implementations):
+    return sum([implementation_usage_weight(x) for x in implementations])
+
+
+def implementation_usage_weight(implementation):
+    """This is an example usage weight for an implementation, it does not
+    reflect real world usage."""
+    weight = 1
+    name, number = implementation
+    version = LooseVersion(number)
+
+    if "openssl" in name:
+        weight *= 5
+        if version >= LooseVersion("1.1"):
+            weight *= 5
+        elif version >= LooseVersion("1.0"):
+            weight *= 2
+
+    elif "mbedtls" in name:
+        if version >= LooseVersion("2.7"):
+            weight *= 5
+        elif version >= LooseVersion("2.0"):
+            weight *= 2
+
+    return weight
+
+
 MODEL_WEIGHTS = {
     "equal": equal_model_weight,
     "count": implementation_count_model_weight,
+    "usage": recent_implementation_model_weight,
 }
 
 
