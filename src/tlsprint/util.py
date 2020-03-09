@@ -97,3 +97,11 @@ def dedup_implementation_dir(implementation_path):
             protocol = protocol_path.name
             results[protocol][model].append((implementation, version))
     return results
+
+
+def format_tls_string(version):
+    """Formats a string in the form of "TLS12" to "TLS 1.2" for pretty
+    printing."""
+    version = version.replace("TLS", "TLS ")
+    protocol, number = version.split()
+    return f"{protocol} {int(number) / 10}"

@@ -3,9 +3,11 @@ import copy
 import itertools
 import pathlib
 
+import numpy
 import pandas
 import seaborn
 from matplotlib import pyplot
+from tlsprint import util
 from tlsprint.identify import INPUT_SELECTORS, MODEL_WEIGHTS, identify
 from tlsprint.trees import trees
 
@@ -19,7 +21,7 @@ def count_resets(messages):
 
 
 PATH_VALUES = {
-    "count": count_inputs,
+    "inputs": count_inputs,
     "resets": count_resets,
 }
 
@@ -123,56 +125,73 @@ def implementation_count_weight(model_info):
     return len(model_info["implementations"])
 
 
-def visualize_tls_group(benchmark_data, output_directory, version):
-    print(len(benchmark_data))
-    return
-    output_path = output_directory / f"{title}.pdf"
+def visualize(benchmark_data, output_directory, version, weight_function):
+    version_string = util.format_tls_string(version)
+    file_name = f"{version} {weight_function}.pdf"
+    output_path = output_directory / file_name
+
+    title = f"{version_string}, model weight: {weight_function}"
     pyplot.title(title)
 
     data = pandas.DataFrame()
     for entry in benchmark_data:
-
-        name = f"{entry['type'].upper()} {entry['weight']}"
+        name = f"{entry['type'].upper()}"
         if entry["type"].lower() != "adg":
             name += f" {entry['selector']}"
 
         for item in entry["benchmark"]:
-            value = count_inputs(item)
-            weight = item["weight"]
-            data = data.append(
-                [{"name": name, "value": value,} for _ in range(weight)],
-                ignore_index=True,
-            )
+            for metric, value in item["values"].items():
+                data = data.append(
+                    [
+                        {"name": name, "value": value, "metric": metric,}
+                        for _ in range(item["weight"])
+                    ],
+                    ignore_index=True,
+                )
 
-    output_path = output_directory / f"{title}.pdf"
-    seaborn.violinplot(x="name", y="value", data=data, showmeans=True)
+    seaborn.violinplot(
+        x="name",
+        y="value",
+        data=data,
+        bw=0.1,
+        scale="count",
+        hue="metric",
+        split=True,
+        inner=None,
+    )
+    seaborn.pointplot(
+        x="name",
+        y="value",
+        data=data,
+        estimator=numpy.mean,
+        join=False,
+        hue="metric",
+        palette="bright",
+        capsize=0.1,
+        legend=False,
+    )
+    seaborn
     pyplot.savefig(output_path)
     pyplot.clf()
+
+
+def visualize_tls_group(benchmark_data, output_directory, version):
+    for weight_function in MODEL_WEIGHTS.keys():
+        subset = [
+            entry for entry in benchmark_data if entry["weight"] == weight_function
+        ]
+        visualize(subset, output_directory, version, weight_function)
+
+    return
 
 
 def visualize_all(benchmark_data, output_directory):
     output_directory = pathlib.Path(output_directory)
     output_directory.mkdir(exist_ok=True)
+    seaborn.set(style="dark", palette="pastel", color_codes=True)
 
     tls_versions = {entry["version"] for entry in benchmark_data}
     for version in sorted(tls_versions):
         subset = [entry for entry in benchmark_data if entry["version"] == version]
         visualize_tls_group(subset, output_directory, version)
     return
-
-    # Group by TLS version
-    grouped_by_tls = collections.defaultdict(list)
-    for entry in benchmark_data:
-        grouped_by_tls[entry["version"]].append(entry)
-
-    for tls_version, entries in grouped_by_tls.items():
-        # Group by TLS version
-        grouped_by_weight_function = collections.defaultdict(list)
-        for entry in benchmark_data:
-            grouped_by_weight_function[entry["weight"]].append(entry)
-
-        for weight_function, sub_entries in grouped_by_weight_function.items():
-
-            visualize_tls_group(
-                sub_entries, output_directory, f"{tls_version} {weight_function}"
-            )

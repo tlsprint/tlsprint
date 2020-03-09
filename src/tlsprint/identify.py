@@ -84,7 +84,10 @@ INPUT_SELECTORS = {
     "random": random_selector,
     "first": always_first_selector,
     "gini": gini_selector,
-    "entropy": entropy_selector,
+    # The entropy selector yields the same decision results as the gini
+    # selector, but is more expensive to compute (due to the log). It is
+    # therefore included as a reference, but not enabled by default.
+    # "entropy": entropy_selector,
 }
 
 
