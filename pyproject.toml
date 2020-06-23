@@ -1,9 +1,15 @@
 [build-system]
 requires = [
-    "setuptools >= 30.3.0",
-    "setuptools_scm",
+    "setuptools >= 42",
+    "setuptools_scm[toml] >= 3.4",
     "wheel",
 ]
+build-backend = "setuptools.build_meta"
+
+# Infer version number from source-control management (e.g. Git)
+[tool.setuptools_scm]
+write_to = "src/tlsprint/_version.py"
+write_to_template = "__version__ = '{version}'"
 
 [tool.black]
 target-version = ["py36"]
