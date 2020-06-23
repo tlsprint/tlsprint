@@ -1,16 +1,16 @@
 """Verify that the package can be installed and the metadata is set."""
 
-import unittest
-import venv
-import tempfile
 import pathlib
 import shlex
 import subprocess
 import sys
+import tempfile
+import unittest
+import venv
 from email.parser import HeaderParser
 
-from . import __version__
 from . import PACKAGE_NAME
+from . import __version__
 
 
 def checked_subprocess_run(command):

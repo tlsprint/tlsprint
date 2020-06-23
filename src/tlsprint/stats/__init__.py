@@ -1,4 +1,6 @@
-from tlsprint.stats import dedup_per_implementation, dedup_per_tls, total_models
+from tlsprint.stats import dedup_per_implementation
+from tlsprint.stats import dedup_per_tls
+from tlsprint.stats import total_models
 
 TYPE_HANDLERS = {
     "total-models": total_models.summary,

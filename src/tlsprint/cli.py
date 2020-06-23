@@ -6,14 +6,14 @@ from pathlib import Path
 
 import click
 import tabulate
-from tlsprint import stats, util
-from tlsprint.benchmark import benchmark_all, visualize_all
+from tlsprint import stats
+from tlsprint import util
+from tlsprint.benchmark import benchmark_all
+from tlsprint.benchmark import visualize_all
 from tlsprint.identify import identify
-from tlsprint.learn import (
-    SUPPORTED_TREE_TYPES,
-    _dot_to_networkx,
-    construct_tree_from_dedup,
-)
+from tlsprint.learn import SUPPORTED_TREE_TYPES
+from tlsprint.learn import _dot_to_networkx
+from tlsprint.learn import construct_tree_from_dedup
 
 
 @click.group()
