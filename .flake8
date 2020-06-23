@@ -1,0 +1,26 @@
+[flake8]
+# Select which violations Flake8 should check
+select =
+# - flake8-bugbear (including all optionals)
+    B B9
+# - McCabe complexity checker (requires `max-complexity` to be set)
+    C
+# - pycodestyle (both errors and warnings)
+    E W
+# - pyflakes
+    F
+
+# Specify which violations should be ignored
+ignore =
+# These checks conflict with Black
+    E203 E501 W503
+
+# Set the maximum line length, this is used by flake8-bugbear for B950 and is
+# compatible with Black.
+max-line-length = 80
+
+# McCabe recommends a maximum complexity of 10. Sometimes a higher complexity
+# should be permitted, this should be done by locally disabling this check (add
+# `# noqa: C901` to the function definition) and providing an explanation of
+# why the limit was exceeded.
+max-complexity = 10
