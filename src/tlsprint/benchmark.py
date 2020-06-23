@@ -142,7 +142,7 @@ def visualize(benchmark_data, output_directory, version, weight_function):
             for metric, value in item["values"].items():
                 data = data.append(
                     [
-                        {"name": name, "value": value, "metric": metric,}
+                        {"name": name, "value": value, "metric": metric}
                         for _ in range(item["weight"])
                     ],
                     ignore_index=True,
