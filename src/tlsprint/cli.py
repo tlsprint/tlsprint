@@ -6,14 +6,15 @@ from pathlib import Path
 
 import click
 import tabulate
-from tlsprint import stats
-from tlsprint import util
-from tlsprint.benchmark import benchmark_all
-from tlsprint.benchmark import visualize_all
-from tlsprint.identify import identify
-from tlsprint.learn import SUPPORTED_TREE_TYPES
-from tlsprint.learn import _dot_to_networkx
-from tlsprint.learn import construct_tree_from_dedup
+
+from . import stats
+from . import util
+from .benchmark import benchmark_all
+from .benchmark import visualize_all
+from .identify import identify
+from .learn import SUPPORTED_TREE_TYPES
+from .learn import _dot_to_networkx
+from .learn import construct_tree_from_dedup
 
 
 @click.group()
@@ -53,7 +54,7 @@ def identify_command(target, target_port, tree, graph_dir):
     target. By default this will use the tree provided with the distribution,
     but a custom tree can be supplied.
     """
-    from tlsprint import trees
+    from . import trees
 
     if not tree:
         # For now, default to ADG TLS12

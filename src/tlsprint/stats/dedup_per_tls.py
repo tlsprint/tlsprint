@@ -1,6 +1,6 @@
 import pathlib
 
-from tlsprint import learn
+from .. import learn
 
 
 def _tls_summary(tls_path: pathlib.Path):

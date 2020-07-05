@@ -7,11 +7,12 @@ import numpy
 import pandas
 import seaborn
 from matplotlib import pyplot
-from tlsprint import util
-from tlsprint.identify import INPUT_SELECTORS
-from tlsprint.identify import MODEL_WEIGHTS
-from tlsprint.identify import identify
-from tlsprint.trees import trees
+
+from . import util
+from .identify import INPUT_SELECTORS
+from .identify import MODEL_WEIGHTS
+from .identify import identify
+from .trees import trees
 
 
 def count_inputs(messages):
