@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 import tabulate
 
+from . import __version__
 from . import stats
 from . import util
 from .benchmark import benchmark_all
@@ -18,6 +19,7 @@ from .learn import construct_tree_from_dedup
 
 
 @click.group()
+@click.version_option(__version__)
 def main():
     pass
 
