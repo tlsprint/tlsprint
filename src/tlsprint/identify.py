@@ -243,6 +243,36 @@ class BenchmarkConnector(AbastractConnector):
         self.current_node = ()
 
 
+def _color_path(tree, endpoint, color):
+    """Color the nodes and edges in the tree, from the root of the up to the
+    given node.
+
+    Args:
+        tree: Tree that in which the path will be colored.
+        endpoint: Node that indicates the end of the path to be colored.
+        color: Color to give to the path. If color is False, the color
+                attribute will be removed from the path instead.
+    """
+    # The node contains the path information, so it can be used to create
+    # a list of all nodes and all edges to be colored.
+    node_names = tuple(endpoint[:i] for i in range(len(endpoint) + 1))
+    edge_names = tuple(zip(node_names, node_names[1:]))
+
+    nodes = [tree.nodes[name] for name in node_names]
+    edges = [tree.edges[name] for name in edge_names]
+
+    for target in nodes + edges:
+        if color:
+            # If the color is set, we apply this to the target node or edge
+            target["color"] = color
+        else:
+            # If the color is not set, we remove the color attribute
+            try:
+                del target["color"]
+            except KeyError:
+                pass
+
+
 def identify(
     tree,
     target,
@@ -277,9 +307,9 @@ def identify(
             connector.close()
             return
 
-        # Log the node, color it and draw the graph
         if graph_dir:
-            tree.nodes[leaf_node]["color"] = "red"
+            # Color the path leading to the final response node.
+            _color_path(tree, leaf_node, "red")
             tree.draw(
                 path=graph_dir / "iteration-{}.1-pre-prune.svg".format(iteration),
                 fmt="svg",
@@ -294,6 +324,8 @@ def identify(
                 path=graph_dir / "iteration-{}.2-post-prune.svg".format(iteration),
                 fmt="svg",
             )
+            # Clear the path color after drawing this graph
+            _color_path(tree, leaf_node, False)
 
         # Condense the tree
         tree.condense()
