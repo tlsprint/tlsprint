@@ -281,7 +281,7 @@ def identify(
         if graph_dir:
             tree.nodes[leaf_node]["color"] = "red"
             tree.draw(
-                path=graph_dir / "iteration-{}-pre-prune.svg".format(iteration),
+                path=graph_dir / "iteration-{}.1-pre-prune.svg".format(iteration),
                 fmt="svg",
             )
 
@@ -291,7 +291,7 @@ def identify(
 
         if graph_dir:
             tree.draw(
-                path=graph_dir / "iteration-{}-post-prune.svg".format(iteration),
+                path=graph_dir / "iteration-{}.2-post-prune.svg".format(iteration),
                 fmt="svg",
             )
 
@@ -310,7 +310,7 @@ def identify(
 
         if graph_dir:
             tree.draw(
-                path=graph_dir / "iteration-{}-condensed.svg".format(iteration),
+                path=graph_dir / "iteration-{}.3-condensed.svg".format(iteration),
                 fmt="svg",
             )
 
