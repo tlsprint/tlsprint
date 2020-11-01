@@ -24,13 +24,14 @@ def main():
     pass
 
 
-@main.command("learn")
+@main.command("construct")
 @click.argument("dedup_directory", type=click.Path(exists=True))
 @click.argument("output", type=click.File("wb"))
 @click.option("--tree-type", default="adg", type=click.Choice(SUPPORTED_TREE_TYPES))
 def learn_command(dedup_directory, output, tree_type):
-    """Learn the distinguishing sequences based on the output of the `dedup`
-    command. Write the resulting tree to 'output' as a pickled object."""
+    """Construct a tree for the identification, based on the output of the
+    `dedup` command. Write the resulting tree to 'output' as a pickled
+    object."""
     tree = construct_tree_from_dedup(dedup_directory, tree_type=tree_type)
     pickle.dump(tree, output)
 
