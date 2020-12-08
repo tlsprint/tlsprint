@@ -2,6 +2,7 @@ import collections
 import copy
 import itertools
 import pathlib
+import time
 
 import numpy
 import pandas
@@ -31,6 +32,8 @@ PATH_VALUES = {
 
 def benchmark_model(tree, model, selector, weight_function):
     tree_copy = copy.deepcopy(tree)
+
+    start_time = time.perf_counter()
     path = identify(
         tree_copy,
         model,
@@ -38,10 +41,15 @@ def benchmark_model(tree, model, selector, weight_function):
         selector=selector,
         weight_function=weight_function,
     )
-    return {name: value(path) for name, value in PATH_VALUES.items()}
+    end_time = time.perf_counter()
+
+    results = {name: value(path) for name, value in PATH_VALUES.items()}
+    results["time"] = start_time - end_time
+
+    return results
 
 
-def benchmark(tree, selector, weight_function):
+def benchmark(tree, selector, weight_function, info):
     """Return the inputs and outputs used to identify each model in the
     tree."""
     models = tree.models
@@ -72,30 +80,41 @@ def benchmark(tree, selector, weight_function):
     return results
 
 
-def benchmark_all():
-    benchmark_inputs = []
+def generate_benchmark_inputs():
+    # First create a list of the available trees, one for each combination of
+    # tree type and TLS version.
+    queue = []
     for tree_type, tls_versions in trees.items():
         for version, tree in tls_versions.items():
-            selectors = INPUT_SELECTORS.keys()
-            weight_functions = MODEL_WEIGHTS.keys()
+            queue.append({"tree_type": tree_type, "tls_version": version, "tree": tree})
 
-            if tree_type == "adg":
-                # The ADG tree type has no use for different selectors or
-                # weight functions, as there is always only one input
-                # possible.
-                selectors = ("first",)
+    # Next, combine the queue with the input selectors.
+    queue = [
+        {**values, "selector": selector}
+        for values, selector in itertools.product(queue, INPUT_SELECTORS.keys())
+    ]
 
-            for selector, weight in itertools.product(selectors, weight_functions):
-                benchmark_inputs.append(
-                    {
-                        "type": tree_type,
-                        "version": version,
-                        "tree": tree,
-                        "selector": selector,
-                        "weight": weight,
-                    }
-                )
+    # The ADG method doesn't benefit from input selectors as only one input
+    # is available at each time. The "first" selector is therefore enough for
+    # the ADG and we remove the others.
+    def should_keep(values):
+        if values["tree_type"] == "adg" and values["selector"] != "first":
+            return False
+        return True
 
+    queue = [values for values in queue if should_keep(values)]
+
+    # We then take the product of the queue with the weight functions
+    queue = [
+        {**values, "weight": weight}
+        for values, weight in itertools.product(queue, MODEL_WEIGHTS.keys())
+    ]
+
+    return queue
+
+
+def benchmark_all():
+    benchmark_inputs = generate_benchmark_inputs()
     results = []
     for info in benchmark_inputs:
         benchmark_result = benchmark(
