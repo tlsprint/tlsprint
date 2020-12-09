@@ -68,40 +68,60 @@ class ModelTree(networkx.DiGraph):
                 self.prune_node(leaf)
 
     def condense(self):
-        """Make the tree more compact by merging together nodes whose leaves
-        are all the same, and the leaves that contain 100% of the models in the
-        tree."""
-        # Remove leafs that contain 100% of the models
+        """Make the tree more compact by removing redundant information:
+        -   Remove the paths that contains 100% of the models.
+        -   Remove inputs that no longer provide distinguishing information.
+        """
+        # Remove the leaves (and their parents) that contain 100% of the
+        # models
         models = self.models
         for leaf in self.leaves:
             if self.nodes[leaf]["models"] == models:
                 self.prune_node(leaf)
 
-        # For each leaf, check if its parent contains other models. If not,
-        # merge them together in one node.
-        changed = True
-        while changed:
-            changed = False
+        # Next, we want to remove input messages that do no longer provide
+        # distinguishing information. We do this bottom up, starting at the
+        # leaf nodes and going two parents up. This is the layer where the
+        # previous input messages are located. We create a set of these
+        # ancestors. We do not check if the "leaf has no parent" condition,
+        # because that would mean we only have a single leaf, being the root
+        # node.
+        ancestors = {self.parent(self.parent(leaf)) for leaf in self.leaves}
 
-            for leaf in self.leaves:
-                # Take the subtree of two predecessors up (because of the
-                # structure of the graph)
-                one_up = self.parent(leaf)
-                two_up = self.parent(one_up)
+        # Now for every ancestor we will remove the redundant inputs.
+        tree_start_size = len(self)
+        for node in ancestors:
+            # We take the subtree of this ancestor, which corresponds with
+            # a set of leaves and models that is different from the larger
+            # tree.
+            subtree = self.subtree(node)
+            leaves = subtree.leaves
+            models = subtree.models
 
-                subtree = self.subtree(two_up)
-                models = self.nodes[leaf]["models"]
+            # For every available input, we check if it is redundant. This is
+            # the case when:
+            # - The input only has one possible output.
+            # - This output leads to a leaf node.
+            redundant_nodes = set()
+            for input_node in subtree[node]:
+                output_nodes = list(subtree.neighbors(input_node))
+                if len(output_nodes) == 1 and output_nodes[0] in leaves:
+                    # If this is the case, these nodes as redundant
+                    redundant_nodes.update([input_node, output_nodes[0]])
 
-                if subtree.models == models and subtree.out_degree(two_up) == len(
-                    subtree.leaves
-                ):
-                    # List the models at this root node in the original tree,
-                    # and remove the other nodes
-                    self.nodes[two_up]["models"] = models
-                    redundant_nodes = set(subtree.nodes) - {two_up}
-                    self.remove_nodes_from(redundant_nodes)
-                    changed = True
-                    break
+            # Remove the redundant nodes
+            self.remove_nodes_from(redundant_nodes)
+
+            # After (possibly) removing some paths, we now check if the
+            # ancestor has any paths lefts in the original tree.
+            if self.out_degree(node) == 0:
+                # If not, we move the information about the models to this
+                # node.
+                self.nodes[node]["models"] = models
+
+        # If the tree has changed, condense it again
+        if len(self) != tree_start_size:
+            self.condense()
 
     def draw(self, fmt="dot", path=None):
         """Draw this tree using Graphviz in a desired output format. This
