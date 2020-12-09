@@ -37,7 +37,7 @@ def benchmark_model(tree, model, selector, weight_function):
     tree_copy = copy.deepcopy(tree)
 
     start_time = time.perf_counter()
-    path = identify(
+    candidate_models, path = identify(
         tree_copy,
         model,
         benchmark=True,
@@ -45,6 +45,11 @@ def benchmark_model(tree, model, selector, weight_function):
         weight_function=weight_function,
     )
     end_time = time.perf_counter()
+
+    # If the desired model is not in the list of leaf model,
+    # something went wrong and we should abort.
+    if model not in candidate_models:
+        raise RuntimeError("Benchmark model does not match found model!")
 
     results = {name: value(path) for name, value in PATH_VALUES.items()}
     results["time"] = end_time - start_time

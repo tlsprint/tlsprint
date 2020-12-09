@@ -336,7 +336,7 @@ def identify(
         if len(tree) == 0:
             connector.close()
             if benchmark:
-                return connector.messages
+                return (leaf_models, connector.messages)
             else:
                 return leaf_models
 
