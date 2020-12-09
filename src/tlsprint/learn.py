@@ -15,6 +15,12 @@ from networkx.algorithms.traversal.depth_first_search import dfs_tree
 class ModelTree(networkx.DiGraph):
     """Data structure to store an ADG or HDT created from LearnLib models."""
 
+    def parent(self, node):
+        """Return the parent of the specified node."""
+        # This uses the `predecessors` function, with the assumption that
+        # each node has at most one predecessors, it's parent.
+        return list(self.predecessors(node))[0]
+
     @property
     def leaves(self):
         return [node for node in self.nodes if self.out_degree(node) == 0]
@@ -39,16 +45,14 @@ class ModelTree(networkx.DiGraph):
         pruning = True
         while pruning:
             node = redundant_nodes[-1]
-            # It is a tree, to each node only has one predecessor at
-            # most.
             try:
-                predecessor = list(self.predecessors(node))[0]
+                parent = self.parent(node)
             except IndexError:
                 break  # At the top of the tree
 
-            if self.out_degree(predecessor) == 1:
+            if self.out_degree(parent) == 1:
                 # Only connected to the lower redundant node
-                redundant_nodes.append(predecessor)
+                redundant_nodes.append(parent)
             else:
                 pruning = False
 
@@ -89,8 +93,8 @@ class ModelTree(networkx.DiGraph):
             for leaf in self.leaves:
                 # Take the subtree of two predecessors up (because of the
                 # structure of the graph)
-                one_up = list(self.predecessors(leaf))[0]
-                two_up = list(self.predecessors(one_up))[0]
+                one_up = self.parent(leaf)
+                two_up = self.parent(one_up)
 
                 subtree = self.subtree(two_up)
                 models = self.nodes[leaf]["models"]
