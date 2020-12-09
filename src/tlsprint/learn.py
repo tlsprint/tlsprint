@@ -40,25 +40,18 @@ class ModelTree(networkx.DiGraph):
         """Cut a node from the tree, pruning the predecessors away as far as
         possible.
         """
-        redundant_nodes = [node]
-
-        pruning = True
-        while pruning:
-            node = redundant_nodes[-1]
-            try:
-                parent = self.parent(node)
-            except IndexError:
-                break  # At the top of the tree
-
+        # If this node has a redundant parent (one that is only connected to
+        # this node), prune that one first.
+        try:
+            parent = self.parent(node)
             if self.out_degree(parent) == 1:
-                # Only connected to the lower redundant node
-                redundant_nodes.append(parent)
-            else:
-                pruning = False
+                self.prune_node(parent)
 
-        # Remove the redundant nodes
-        for node in redundant_nodes:
-            self.remove_node(node)
+        except IndexError:
+            pass  # The node has no parent to prune
+
+        # Remove the node from the tree
+        self.remove_node(node)
 
     def prune_models(self, models):
         """Prune the specified models from the tree, removing redundant nodes
