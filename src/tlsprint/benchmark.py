@@ -6,7 +6,6 @@ import operator
 import pathlib
 import time
 
-import numpy
 import pandas
 import seaborn
 import tqdm
@@ -142,69 +141,6 @@ def benchmark_all():
     return results
 
 
-def count_inputs(model_info):
-    return len(model_info["path"]) // 2
-
-
-def equal_model_weight(model_info):
-    return 1
-
-
-def implementation_count_weight(model_info):
-    return len(model_info["implementations"])
-
-
-def visualize(benchmark_data, output_directory, tls_version, weight_function):
-    tls_version_string = util.format_tls_string(tls_version)
-    file_name = f"{tls_version} {weight_function}.pdf"
-    output_path = output_directory / file_name
-
-    data = pandas.DataFrame()
-    for entry in benchmark_data:
-        name = f"{entry['tree_type'].upper()}"
-        if name != "ADG":
-            name += f" {entry['selector']}"
-
-        for item in entry["result"].items():
-            for metric, value in item["values"].items():
-                data = data.append(
-                    [
-                        {"name": name, "value": value, "metric": metric}
-                        for _ in range(item["weight"])
-                    ],
-                    ignore_index=True,
-                )
-
-    seaborn.violinplot(
-        x="name",
-        y="value",
-        data=data,
-        bw=0.1,
-        scale="count",
-        hue="metric",
-        split=True,
-        inner=None,
-    )
-    seaborn.pointplot(
-        x="name",
-        y="value",
-        data=data,
-        estimator=numpy.mean,
-        join=False,
-        hue="metric",
-        palette="bright",
-        capsize=0.1,
-        legend=False,
-    )
-
-    title = f"{tls_version_string} - Model weight: {weight_function.capitalize()}"
-    pyplot.title(title)
-    pyplot.xlabel("Identification method")
-    pyplot.ylabel("Metric value")
-    pyplot.savefig(output_path)
-    pyplot.clf()
-
-
 def _group_data(data, fields):
     """Sort and group the data by the specified fields"""
     key_function = operator.itemgetter(*fields)
@@ -213,38 +149,6 @@ def _group_data(data, fields):
         key: list(values) for key, values in itertools.groupby(data, key=key_function)
     }
     return grouped_data
-
-
-def visualize_tls_group(benchmark_data, output_directory, version):
-    weights = {entry["weight"] for entry in benchmark_data}
-    for weight_function in weights:
-        subset = [
-            entry for entry in benchmark_data if entry["weight"] == weight_function
-        ]
-        visualize(subset, output_directory, version, weight_function)
-
-    return
-
-
-def visualize_tls_version_weight(data, title, output_path):
-    breakpoint()
-    print(title, len(data))
-    pass
-
-
-def visualize_tls_version(tls_version, data, output_directory):
-    # We want to compare the data for each weight function
-    weight_key = operator.itemgetter("weight")
-    data = sorted(data, key=weight_key)
-    subsets = {
-        weight_function: list(subdata)
-        for weight_function, subdata in itertools.groupby(data, key=weight_key)
-    }
-
-    for weight_function, subdata in subsets.items():
-        visualize_tls_version_weight(
-            tls_version, weight_function, subdata, output_directory
-        )
 
 
 def visualize_subset(data, label, metric, title, output_path):
@@ -319,27 +223,3 @@ def visualize_all(benchmark_data, output_directory):
             label = {"name": "Method", "field": "method"}
 
             visualize_subset(values, label, metric, title, output_path)
-            # visualize_tls_version_weight(values, title, output_path)
-    return
-
-    # Data for different TLS versions is not comparable, so we group by
-    # that first, for which the data needs to be sorted.
-    tls_key = operator.itemgetter("tls_version")
-    benchmark_data = sorted(benchmark_data, key=tls_key)
-    subsets = {
-        tls_version: list(subdata)
-        for tls_version, subdata in itertools.groupby(benchmark_data, key=tls_key)
-    }
-
-    for tls_version, subdata in subsets.items():
-        visualize_tls_version(tls_version, subdata, output_directory)
-
-    return
-
-    seaborn.set(style="dark", palette="pastel", color_codes=True)
-
-    tls_versions = {entry["tls_version"] for entry in benchmark_data}
-    for version in sorted(tls_versions):
-        subset = [entry for entry in benchmark_data if entry["tls_version"] == version]
-        visualize_tls_group(subset, output_directory, version)
-    return
