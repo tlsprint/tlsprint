@@ -57,18 +57,13 @@ def benchmark_model(tree, model, selector, weight_function):
     return results
 
 
-def benchmark(info):
+def benchmark(info, iterations=20):
     """Return the inputs and outputs used to identify each model in the
     tree."""
     tree = info["tree"]
     model = info["model"]
     selector = INPUT_SELECTORS[info["selector"]]
     weight_function = MODEL_WEIGHTS[info["weight"]]
-
-    if selector == INPUT_SELECTORS["random"]:
-        iterations = 20
-    else:
-        iterations = 1
 
     path_values = []
     for _ in range(iterations):
@@ -260,30 +255,29 @@ def visualize_subset(data, label, metric, title, output_path):
     df = pandas.DataFrame(columns=["label", "metric"])
     for entry in data:
         row = {
-            "label": entry[label["field"]],
-            "metric": entry["result"]["values"][metric["field"]],
+            label["name"]: entry[label["field"]],
+            metric["name"]: entry["result"]["values"][metric["field"]],
         }
         values = [row for _ in range(entry["result"]["weight"])]
         df = df.append(values, ignore_index=True)
 
-    seaborn.displot(
-        x="metric", col="label", data=df, kde=True,
-    )
-    # seaborn.pointplot(
-    #     x="label",
-    #     y="metric",
-    #     data=df,
-    #     estimator=numpy.mean,
-    #     palette="bright",
-    #     capsize=0.1,
-    #     legend=False,
-    # )
+    # Sort the data to set the column order
+    df = df.sort_values([label["name"]])
 
-    pyplot.title(title)
-    pyplot.xlabel(label["name"])
-    pyplot.ylabel(metric["name"])
-    pyplot.savefig(output_path)
+    # Create a plot of the data and save this figure.
+    seaborn.set_theme(font_scale=2, style="whitegrid")
+    pyplot.savefig(output_path.with_suffix(".pdf"))
     pyplot.close()
+
+    # Create a markdown file with a table describing the same data
+    grouped_df = df.groupby(label["name"])
+    markdown = grouped_df[metric["name"]].describe().round(4).to_markdown()
+
+    # Add caption to table
+    markdown += "\n\n"
+    markdown += f": Benchmark summary for {title}"
+    with open(output_path.with_suffix(".md"), "w") as f:
+        f.write(markdown)
 
 
 def visualize_all(benchmark_data, output_directory):
@@ -298,7 +292,7 @@ def visualize_all(benchmark_data, output_directory):
     for entry in benchmark_data:
         entry["method"] = entry["tree_type"].upper()
 
-        if entry["method"] != "adg":
+        if entry["method"] != "ADG":
             entry["method"] += " " + entry["selector"].capitalize()
 
     # We want to compare the performance of the different methods for
@@ -312,7 +306,7 @@ def visualize_all(benchmark_data, output_directory):
             {"name": "Number of resets", "field": "resets"},
             {"name": "Time in seconds", "field": "time"},
         ]:
-            filename = " ".join(key) + f" {metric['field']}.pdf"
+            filename = " ".join(key) + f" {metric['field']}"
             output_path = output_directory / filename
 
             title = (
@@ -321,7 +315,7 @@ def visualize_all(benchmark_data, output_directory):
                 f", metric: {metric['field']}"
             )
 
-            label = {"name": "Identification method", "field": "method"}
+            label = {"name": "Method", "field": "method"}
 
             visualize_subset(values, label, metric, title, output_path)
             # visualize_tls_version_weight(values, title, output_path)
