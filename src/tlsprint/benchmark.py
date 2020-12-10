@@ -266,6 +266,7 @@ def visualize_subset(data, label, metric, title, output_path):
 
     # Create a plot of the data and save this figure.
     seaborn.set_theme(font_scale=2, style="whitegrid")
+    seaborn.displot(x=metric["name"], col=label["name"], data=df)
     pyplot.savefig(output_path.with_suffix(".pdf"))
     pyplot.close()
 
