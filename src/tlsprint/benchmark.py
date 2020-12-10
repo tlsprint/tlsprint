@@ -57,7 +57,7 @@ def benchmark_model(tree, model, selector, weight_function):
     return results
 
 
-def benchmark(info, iterations=20):
+def benchmark(info, iterations=100):
     """Return the inputs and outputs used to identify each model in the
     tree."""
     tree = info["tree"]
