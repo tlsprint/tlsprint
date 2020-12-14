@@ -1,4 +1,3 @@
-import collections
 import copy
 import itertools
 import multiprocessing
@@ -56,7 +55,7 @@ def benchmark_model(tree, model, selector, weight_function):
     return results
 
 
-def benchmark(info, iterations=100):
+def benchmark(info):
     """Return the inputs and outputs used to identify each model in the
     tree."""
     tree = info["tree"]
@@ -64,16 +63,7 @@ def benchmark(info, iterations=100):
     selector = INPUT_SELECTORS[info["selector"]]
     weight_function = MODEL_WEIGHTS[info["weight"]]
 
-    path_values = []
-    for _ in range(iterations):
-        path_values.append(benchmark_model(tree, model, selector, weight_function))
-
-    # Compute averages of path values
-    values_sums = collections.defaultdict(int)
-    for values in path_values:
-        for name, value in values.items():
-            values_sums[name] += value
-    averages = {name: sum / len(path_values) for name, sum in values_sums.items()}
+    result = benchmark_model(tree, model, selector, weight_function)
 
     return {
         "tree_type": info["tree_type"],
@@ -83,7 +73,7 @@ def benchmark(info, iterations=100):
         "weight": info["weight"],
         "result": {
             "weight": weight_function(tree.model_mapping[model]),
-            "values": averages,
+            "values": result,
         },
     }
 
@@ -129,8 +119,9 @@ def generate_benchmark_inputs():
     return queue
 
 
-def benchmark_all():
+def benchmark_all(iterations=100):
     benchmark_inputs = generate_benchmark_inputs()
+    benchmark_inputs = benchmark_inputs * iterations
 
     input_count = len(benchmark_inputs)
     with multiprocessing.Pool() as p:
