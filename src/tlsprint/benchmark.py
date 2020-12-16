@@ -1,3 +1,4 @@
+import collections
 import copy
 import itertools
 import multiprocessing
@@ -58,71 +59,134 @@ def benchmark_model(tree, model, selector, weight_function):
 def benchmark(info):
     """Return the inputs and outputs used to identify each model in the
     tree."""
-    tree = info["tree"]
-    model = info["model"]
-    selector = INPUT_SELECTORS[info["selector"]]
-    weight_function = MODEL_WEIGHTS[info["weight"]]
+    tree = info["Tree"]
+    model = info["Model"]
+    selector = INPUT_SELECTORS[info["Input selector"]]
+    weight_function = MODEL_WEIGHTS[info["Weight function"]]
+    iterations = info["Iterations"]
 
-    result = benchmark_model(tree, model, selector, weight_function)
+    results = []
+    for _ in range(iterations):
+        results.append(benchmark_model(tree, model, selector, weight_function))
 
-    return {
-        "tree_type": info["tree_type"],
-        "tls_version": info["tls_version"],
-        "model": info["model"],
-        "selector": info["selector"],
-        "weight": info["weight"],
-        "result": {
-            "weight": weight_function(tree.model_mapping[model]),
-            "values": result,
-        },
+    # Copy most, but not all values from the info object
+    benchmark_results = {
+        key: value for key, value in info.items() if key not in ("Tree", "Iterations")
     }
 
+    # Add the results and return it
+    benchmark_results["Results"] = results
 
-def generate_benchmark_inputs():
-    # First create a list of the available trees, one for each combination of
-    # tree type and TLS version.
-    trees_list = []
+    return benchmark_results
+
+
+def generate_benchmark_inputs(iterations):
+    """Generate benchmarks as a Pandas DataFrame, where each row is lists the
+    input of one benchmark test."""
+    # We initialize a Pandas DataFrame with a list of all the trees, the
+    # resulting DataFrame has the following columns:
+    # - Tree type: This is the tree type, ADG or HDT
+    # - TLS version: The TLS version corresponding to the tree.
+    # - Tree: A reference to the tree itself.
+    # - Model: A list of models names for this tree.
+    tree_list = []
     for tree_type, tls_versions in trees.items():
         for version, tree in tls_versions.items():
-            trees_list.append(
-                {"tree_type": tree_type, "tls_version": version, "tree": tree}
+            tree_list.append(
+                {
+                    "Tree type": tree_type,
+                    "TLS version": version,
+                    "Tree": tree,
+                    "Model": list(tree.models),
+                }
             )
+    df = pandas.DataFrame(tree_list)
 
-    # We then initialize the benchmark queue, containing every model from
-    # every tree
-    queue = []
-    for values in trees_list:
-        queue += [{**values, "model": model} for model in values["tree"].models]
+    # Instead of a list of models, we want a separate row for each model with
+    # the rest of the values the same. This can be done with the `explode`
+    # function.
+    df = df.explode("Model")
 
-    # Next, take the product of the queue with the input selectors.
-    queue = [
-        {**values, "selector": selector}
-        for values, selector in itertools.product(queue, INPUT_SELECTORS.keys())
-    ]
+    # We now have the basic dataset with all the trees and models that we want
+    # to benchmark. The next step we perform, is adding input selectors. For
+    # this we create a mapping between selectors and methods, which defaults to
+    # using all input selectors. For ADG we only add "first", because there is
+    # only one path and more input selection is irrelevant.
+    input_selector_mapping = collections.defaultdict(
+        lambda: list(INPUT_SELECTORS.keys())
+    )
+    input_selector_mapping["adg"] = ["first"]
 
-    # The ADG method doesn't benefit from input selectors as only one input
-    # is available at each time. The "first" selector is therefore enough for
-    # the ADG and we remove the others.
-    def should_keep(values):
-        if values["tree_type"] == "adg" and values["selector"] != "first":
-            return False
-        return True
+    # We then create a dataframe from this mapping.
+    input_selector_df = pandas.DataFrame(
+        [
+            {"Tree type": method, "Input selector": input_selector_mapping[method]}
+            for method in df["Tree type"].unique()
+        ]
+    )
+    # We merge this mapping and explode the Input selector column to get the
+    # extended benchmarks.
+    df = df.merge(input_selector_df, on="Tree type", how="left")
+    df = df.explode("Input selector")
 
-    queue = [values for values in queue if should_keep(values)]
+    # To distinguish between the HDT with different input selectors, we add the
+    # "Method" field, which is the name of the Tree type in upper case with the
+    # input selector. For ADG we only add the tree type
+    not_adg_rows = df["Tree type"] != "adg"
+    df["Method"] = "ADG"
+    df["Method"][not_adg_rows] = (
+        df["Tree type"][not_adg_rows].apply(str.upper)
+        + " "
+        + df["Input selector"][not_adg_rows].apply(str.capitalize)
+    )
 
-    # We then take the product of the queue with the weight functions
-    queue = [
-        {**values, "weight": weight}
-        for values, weight in itertools.product(queue, MODEL_WEIGHTS.keys())
-    ]
+    # Some input selectors can use multiple weight functions. For now this only
+    # applies to the Gini input selector, the rest is unaffected by weight and
+    # is assigned the most simple "equal" function. We still evaluate for
+    # different weights functions during the analysis, but running the
+    # benchmark for different weight functions for "First" and "Random" is
+    # merely a duplication.
+    #
+    # We apply the same trick as above to map the input selectors to the weight
+    # functions. The default here is to only use the "equal" weight function.
+    weight_function_mapping = collections.defaultdict(lambda: ["equal"])
+    weight_function_mapping["gini"] = list(MODEL_WEIGHTS.keys())
 
-    return queue
+    weight_function_df = pandas.DataFrame(
+        [
+            {
+                "Input selector": selector,
+                "Weight function": weight_function_mapping[selector],
+            }
+            for selector in df["Input selector"].unique()
+        ]
+    )
+
+    # Merge the mapping and explode
+    df = df.merge(weight_function_df, on="Input selector", how="left")
+    df = df.explode("Weight function")
+
+    # To distinguish between the different combinations of Gini and weight
+    # functions, we add the weight function to the Method field.
+    gini_rows = df["Input selector"] == "gini"
+    df["Method"][gini_rows] = (
+        df["Method"][gini_rows] + " (" + df["Weight function"][gini_rows] + ")"
+    )
+
+    # Lastly, to pass the iteration count to the benchmark function, add
+    # a column to the dataframe.
+    df["Iterations"] = iterations
+
+    # Convert the dataframe to a list, as this is easier to distribute over
+    # multiple processes.
+
+    return df.to_dict(orient="records")
 
 
 def benchmark_all(iterations=100):
-    benchmark_inputs = generate_benchmark_inputs()
-    benchmark_inputs = benchmark_inputs * iterations
+    benchmark_inputs = generate_benchmark_inputs(iterations)
 
+    # Apply the benchmark function to the inputs and show a progress bar.
     input_count = len(benchmark_inputs)
     with multiprocessing.Pool() as p:
         results = list(
