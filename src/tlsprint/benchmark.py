@@ -1,6 +1,5 @@
 import collections
 import copy
-import itertools
 import multiprocessing
 import operator
 import pathlib
@@ -199,48 +198,104 @@ def benchmark_all(iterations=100):
     return results
 
 
-def _group_data(data, fields):
-    """Sort and group the data by the specified fields"""
-    key_function = operator.itemgetter(*fields)
-    data = sorted(data, key=key_function)
-    grouped_data = {
-        key: list(values) for key, values in itertools.groupby(data, key=key_function)
-    }
-    return grouped_data
+def visualize_weight_function(df, output_directory, weight_name):
+    """Create visualizations for a specified weight function."""
+    # Only the Gini method uses the different weight functions, the rest
+    # doesn't use the weight in the decision process. We do want to compare the
+    # performance when weighted, to see how a different usage of TLS
+    # implementations would impact the different methods.
 
+    # Start by creating a copy of the DataFrame, to prevent modifications to
+    # the original
+    df = df.copy()
 
-def visualize_subset(data, label, metric, title, output_path):
-    # First we create a Pandas dataframe with the data to visualize. This
-    # will include the label field, and the metric field from the result
-    # values. To simulate the model weight, we add this item `weight`
-    # times.
-    df = pandas.DataFrame(columns=["label", "metric"])
-    for entry in data:
-        row = {
-            label["name"]: entry[label["field"]],
-            metric["name"]: entry["result"]["values"][metric["field"]],
-        }
-        values = [row for _ in range(entry["result"]["weight"])]
-        df = df.append(values, ignore_index=True)
+    # For every model, compute the weight using the specified weight_function
+    weight_function = MODEL_WEIGHTS[weight_name]
+
+    def compute_weight(row):
+        tree = trees[row["Tree type"]][row["TLS version"]]
+        model = row["Model"]
+        return weight_function(tree.model_mapping[model])
+
+    weights = df.apply(compute_weight, axis=1)
+
+    # Reformat the TLS version column for the plot
+    df["TLS version"] = df["TLS version"].apply(util.format_tls_string)
+
+    # To simulate that models with a higher weight occur more often, we
+    # multiply the "results" list with the weight to increase the length.
+    df["Results"] *= weights
+
+    # We then explode on the results, to treat all measurements as individual
+    # records.
+    df = df.explode("Results")
+
+    # The results are still stored as dictionary. We extract them and put them
+    # in a more descriptive column name.
+    metric_mapping = [
+        ("inputs", "Number of inputs"),
+        ("resets", "Number of resets"),
+        ("time", "Time in seconds"),
+    ]
+
+    for field, column in metric_mapping:
+        df[column] = df["Results"].apply(operator.itemgetter(field))
 
     # Sort the data to set the column order
-    df = df.sort_values([label["name"]])
+    df.sort_values(["TLS version", "Method"], inplace=True)
 
-    # Create a plot of the data and save this figure.
-    seaborn.set_theme(font_scale=2, style="whitegrid")
-    seaborn.displot(x=metric["name"], col=label["name"], data=df)
-    pyplot.savefig(output_path.with_suffix(".pdf"))
-    pyplot.close()
+    # For every metric plot the results and create a markdown table
+    for field, column in metric_mapping:
+        title = f"{column} with weight function '{weight_name}'"
+        output_path = output_directory / f"{field}_{weight_name}"
 
-    # Create a markdown file with a table describing the same data
-    grouped_df = df.groupby(label["name"])
-    markdown = grouped_df[metric["name"]].describe().round(4).to_markdown()
+        plot_kwargs = {"stat": "probability", "common_norm": False}
+        if field == "time":
+            plot_kwargs["bins"] = 50
+            rounding = 4
+        else:
+            plot_kwargs["binwidth"] = 1
+            rounding = 2
 
-    # Add caption to table
-    markdown += "\n\n"
-    markdown += f": Benchmark summary for {title}"
-    with open(output_path.with_suffix(".md"), "w") as f:
-        f.write(markdown)
+        # Create a plot grid, with one graph for each combination of TLS
+        # version and Method
+        seaborn.set_theme(font_scale=2, style="whitegrid")
+        graph = seaborn.displot(
+            x=column,
+            col="TLS version",
+            row="Method",
+            data=df,
+            facet_kws={"margin_titles": True},
+            **plot_kwargs,
+        )
+        graph.set_titles(col_template="{col_name}", row_template="{row_name}")
+        pyplot.savefig(output_path.with_suffix(".pdf"))
+        pyplot.close()
+
+        # Group the data by TLS version and Method, and create a summary for
+        # the metric.
+        grouped_df = df.groupby(["TLS version", "Method"])
+        summary = grouped_df[column].describe().round(rounding)
+
+        # Drop the "count" value. This is the number of rows, which doesn't
+        # carry a lot of meaning in this context as it's mostly the same.
+        summary = summary.drop("count", axis=1)
+
+        # Reformat the index before we convert to Markdown, otherwise it will
+        # include tuples in the table, which doesn't look good.
+        formatted_index = [" - ".join(x) for x in summary.index]
+        summary.index = formatted_index
+
+        # Convert to Markdown
+        markdown = summary.to_markdown()
+
+        # Add caption to table
+        markdown += "\n\n"
+        markdown += f": Benchmark summary: {title}"
+
+        # Write to output file
+        with open(output_path.with_suffix(".md"), "w") as f:
+            f.write(markdown)
 
 
 def visualize_all(benchmark_data, output_directory):
@@ -248,36 +303,8 @@ def visualize_all(benchmark_data, output_directory):
     output_directory = pathlib.Path(output_directory)
     output_directory.mkdir(exist_ok=True)
 
-    # We want to compare the performance of the different methods: the ADG,
-    # and the HDT with different input selectors. We add a `method` field
-    # which combines this information, which we will use in the plots
-    # later.
-    for entry in benchmark_data:
-        entry["method"] = entry["tree_type"].upper()
+    # Convert data to Pandas dataframe
+    df = pandas.DataFrame(benchmark_data)
 
-        if entry["method"] != "ADG":
-            entry["method"] += " " + entry["selector"].capitalize()
-
-    # We want to compare the performance of the different methods for
-    # across TLS version and for different weight functions. So we group
-    # the data by the `tls_version` and `weight` fields.
-    subsets = _group_data(benchmark_data, ["tls_version", "weight"])
-
-    for key, values in subsets.items():
-        for metric in [
-            {"name": "Number of inputs", "field": "inputs"},
-            {"name": "Number of resets", "field": "resets"},
-            {"name": "Time in seconds", "field": "time"},
-        ]:
-            filename = " ".join(key) + f" {metric['field']}"
-            output_path = output_directory / filename
-
-            title = (
-                f"{util.format_tls_string(key[0])}"
-                f", model weight: {key[1]}"
-                f", metric: {metric['field']}"
-            )
-
-            label = {"name": "Method", "field": "method"}
-
-            visualize_subset(values, label, metric, title, output_path)
+    for weight_function in MODEL_WEIGHTS.keys():
+        visualize_weight_function(df, output_directory, weight_function)
