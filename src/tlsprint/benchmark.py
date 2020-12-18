@@ -45,10 +45,13 @@ def benchmark_model(tree, model, selector, weight_function):
     )
     end_time = time.perf_counter()
 
-    # If the desired model is not in the list of leaf model,
-    # something went wrong and we should abort.
-    if model not in candidate_models:
-        raise RuntimeError("Benchmark model does not match found model!")
+    # The benchmark should always return one model: the candidate model. Any
+    # other scenario must be aborted.
+    if candidate_models != {model}:
+        raise RuntimeError(
+            "Unexpected benchmark model candidates."
+            f"Expected {{model}}, but got {candidate_models}"
+        )
 
     results = {name: value(path) for name, value in PATH_VALUES.items()}
     results["time"] = end_time - start_time
