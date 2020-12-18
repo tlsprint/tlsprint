@@ -178,14 +178,21 @@ def daw_command(graph, output, fmt):
     type=click.Path(exists=True),
     help="Directory where the deduplicated model are stored.",
 )
+@click.option(
+    "--tls-version",
+    type=click.Choice(("TLS10", "TLS11", "TLS12")),
+    help="Specific TLS version, required by 'model-weights'",
+)
 @click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
-def stats_command(stats_type, model_directory, dedup_directory, fmt):
+def stats_command(stats_type, model_directory, dedup_directory, tls_version, fmt):
     """Provide statistics about the available models (number of
     implementations, unique models, etc.).
     """
     for type_ in stats_type:
         summary = stats.TYPE_HANDLERS[type_](
-            models_dir=model_directory, dedup_dir=dedup_directory
+            models_dir=model_directory,
+            dedup_dir=dedup_directory,
+            tls_version=tls_version,
         )
 
         if fmt == "table":
