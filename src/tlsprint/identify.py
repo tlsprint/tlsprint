@@ -75,16 +75,39 @@ def gini_selector(tree, current_node, weight_function):
     total_weight = _tree_weight(
         tree.subtree(current_node), tree.model_mapping, weight_function
     )
-    input_info = [{"node": node} for node in tree[current_node]]
-    for info in input_info:
-        output_nodes = list(tree[info["node"]])
+
+    # For each input message node, compute and store the Gini impurity
+    input_nodes = list(tree[current_node])
+    impurities = {}
+    for input_node in input_nodes:
+        output_nodes = list(tree[input_node])
         weights = [
             _tree_weight(tree.subtree(output_node), tree.model_mapping, weight_function)
             for output_node in output_nodes
         ]
-        info["metric"] = 1 - sum([(x / total_weight) ** 2 for x in weights])
+        impurities[input_node] = 1 - sum([(x / total_weight) ** 2 for x in weights])
 
-    return max(input_info, key=operator.itemgetter("metric"))["node"]
+    # Get the maximum value of the impurity
+    maximum_impurity = max(impurities.values())
+
+    # Get the list of all inputs with this impurity, multiple inputs can have
+    # the same impurity.
+    candidate_inputs = [
+        node for node, value in impurities.items() if value == maximum_impurity
+    ]
+
+    # In case of a tie, we pick the candidate that leads to the smallest
+    # subtree. The main reason for this, is that loop unrolling in the
+    # normalization can result in deep trees, where each intersection has the
+    # same impurity value. By picking the smaller subtree, we reach a leaf node
+    # sooner.
+    if len(candidate_inputs) > 1:
+        subtree_sizes = {node: len(tree.subtree(node)) for node in candidate_inputs}
+        selected, _ = min(subtree_sizes.items(), key=operator.itemgetter(1))
+    else:
+        selected = candidate_inputs[0]
+
+    return selected
 
 
 def entropy_selector(tree, current_node, weight_function):
