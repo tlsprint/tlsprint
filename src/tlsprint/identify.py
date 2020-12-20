@@ -37,17 +37,20 @@ def implementation_weight_recent(implementation):
     version = LooseVersion(number)
 
     if "openssl" in name:
-        weight *= 5
-        if version >= LooseVersion("1.1"):
-            weight *= 5
-        elif version >= LooseVersion("1.0"):
-            weight *= 2
+        if version >= LooseVersion("1.1.1"):
+            # Most recent major version, first released in September 2018
+            weight = 20
+        elif version >= LooseVersion("1.1.0"):
+            # Previous major version, first released in August 2016
+            weight = 5
 
     elif "mbedtls" in name:
-        if version >= LooseVersion("2.7"):
-            weight *= 5
-        elif version >= LooseVersion("2.0"):
-            weight *= 2
+        if version >= LooseVersion("2.16"):
+            # Most recent LTS version, first released in December 2018
+            weight = 20
+        elif version >= LooseVersion("2.7"):
+            # Previous LTS version, first released in February 2018
+            weight = 5
 
     return weight
 
