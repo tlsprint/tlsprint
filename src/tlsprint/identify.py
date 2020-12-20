@@ -17,19 +17,19 @@ def _tree_weight(tree, model_mapping, weight_function):
     return sum([weight_function(model_mapping[model]) for model in tree.models])
 
 
-def equal_model_weight(_):
+def model_weight_equal(_):
     return 1
 
 
-def implementation_count_model_weight(implementations):
+def model_weight_count(implementations):
     return len(implementations)
 
 
-def recent_implementation_model_weight(implementations):
-    return sum([implementation_usage_weight(x) for x in implementations])
+def model_weight_recent(implementations):
+    return sum([implementation_weight_recent(x) for x in implementations])
 
 
-def implementation_usage_weight(implementation):
+def implementation_weight_recent(implementation):
     """This is an example usage weight for an implementation, it does not
     reflect real world usage."""
     weight = 1
@@ -53,9 +53,9 @@ def implementation_usage_weight(implementation):
 
 
 MODEL_WEIGHTS = {
-    "equal": equal_model_weight,
-    "count": implementation_count_model_weight,
-    "usage": recent_implementation_model_weight,
+    "equal": model_weight_equal,
+    "count": model_weight_count,
+    "recent": model_weight_recent,
 }
 
 
@@ -302,7 +302,7 @@ def identify(
     target_port=443,
     graph_dir=None,
     selector=always_first_selector,
-    weight_function=equal_model_weight,
+    weight_function=model_weight_equal,
     benchmark=False,
 ):
     # Create output directory if required
