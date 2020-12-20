@@ -181,7 +181,7 @@ def daw_command(graph, output, fmt):
 @click.option(
     "--tls-version",
     type=click.Choice(("TLS10", "TLS11", "TLS12")),
-    help="Specific TLS version, required by 'model-weights'",
+    help="Specific TLS version, required by 'model-weights' and 'model-sizes'",
 )
 @click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
 def stats_command(stats_type, model_directory, dedup_directory, tls_version, fmt):
