@@ -1,5 +1,4 @@
 import collections
-import copy
 import multiprocessing
 import operator
 import pathlib
@@ -32,15 +31,9 @@ PATH_VALUES = {
 
 
 def benchmark_model(tree, model, selector, weight_function):
-    tree_copy = copy.deepcopy(tree)
-
     start_time = time.perf_counter()
     candidate_models, path = identify(
-        tree_copy,
-        model,
-        benchmark=True,
-        selector=selector,
-        weight_function=weight_function,
+        tree, model, benchmark=True, selector=selector, weight_function=weight_function,
     )
     end_time = time.perf_counter()
 

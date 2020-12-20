@@ -1,6 +1,7 @@
 """Identification components, to be used after learning the model tree."""
 
 import abc
+import copy
 import math
 import operator
 import os
@@ -312,6 +313,9 @@ def identify(
     if graph_dir:
         graph_dir = pathlib.Path(graph_dir)
         graph_dir.mkdir(exist_ok=True)
+
+    # Create a copy of the tree, as it will be modified in this function
+    tree = copy.deepcopy(tree)
 
     if benchmark:
         connector = BenchmarkConnector(target, tree)
