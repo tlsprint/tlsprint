@@ -152,7 +152,7 @@ def dedup_command(model_directory, output_directory):
 @click.argument("graph", type=click.File("rb"))
 @click.argument("output", type=click.File("wb"))
 @click.option("--format", "fmt", default="svg")
-def daw_command(graph, output, fmt):
+def draw_command(graph, output, fmt):
     graph = pickle.load(graph)
     drawing = graph.draw(fmt=fmt)
     output.write(drawing)
