@@ -8,6 +8,7 @@ import pandas
 import seaborn
 import tqdm
 from matplotlib import pyplot
+from statsmodels.stats import weightstats
 
 from . import util
 from .identify import INPUT_SELECTORS
@@ -191,6 +192,22 @@ def benchmark_all(iterations=100):
     return results
 
 
+def _weighted_stats(df, metric, weight):
+    # Create the weighted stats object
+    describer = weightstats.DescrStatsW(df[metric], df[weight])
+
+    # Use this to create a series with the stats
+    stats = pandas.Series()
+    stats["mean"] = describer.mean
+    stats["std"] = describer.std
+
+    quantiles = describer.quantile([0, 0.25, 0.5, 0.75, 1])
+    quantiles.index = ["min", "25%", "50%", "75%", "max"]
+
+    stats = stats.append(quantiles)
+    return stats
+
+
 def visualize_weight_function(df, output_directory, weight_name):
     """Create visualizations for a specified weight function."""
     # Only the Gini method uses the different weight functions, the rest
@@ -210,11 +227,7 @@ def visualize_weight_function(df, output_directory, weight_name):
         model = row["Model"]
         return weight_function(tree.model_mapping[model])
 
-    weights = df.apply(compute_weight, axis=1)
-
-    # To simulate that models with a higher weight occur more often, we
-    # multiply the "results" list with the weight to increase the length.
-    df["Results"] *= weights
+    df["Weight"] = df.apply(compute_weight, axis=1)
 
     # We then explode on the results, to treat all measurements as individual
     # records.
@@ -248,12 +261,13 @@ def visualize_weight_function(df, output_directory, weight_name):
             rounding = 2
 
         # Create a plot grid, with one graph for each combination of TLS
-        # version and Method
+        # version and Method. Important: specify the weight column.
         seaborn.set_theme(font_scale=2, style="whitegrid")
         graph = seaborn.displot(
             x=column,
             col="TLS version",
             row="Method",
+            weights="Weight",
             data=df,
             facet_kws={"margin_titles": True},
             **plot_kwargs,
@@ -268,16 +282,12 @@ def visualize_weight_function(df, output_directory, weight_name):
         for tls_version, tls_group in grouped_by_tls:
             # Group by method
             grouped_by_method = tls_group.groupby("Method")
-            summary = grouped_by_method[column].describe().round(rounding)
 
-            # Drop the "count" value. This is the number of rows, which doesn't
-            # carry a lot of meaning in this context as it's mostly the same.
-            summary = summary.drop("count", axis=1)
-
-            # # Reformat the index before we convert to Markdown, otherwise it will
-            # # include tuples in the table, which doesn't look good.
-            # formatted_index = [" - ".join(x) for x in summary.index]
-            # summary.index = formatted_index
+            # Create a summary consisting of weighted statistics.
+            summary = grouped_by_method.apply(
+                _weighted_stats, metric=column, weight="Weight"
+            )
+            summary = summary.round(rounding)
 
             # Convert to Markdown
             markdown += summary.to_markdown()
