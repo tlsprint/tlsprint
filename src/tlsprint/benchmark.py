@@ -206,14 +206,11 @@ def visualize_weight_function(df, output_directory, weight_name):
     weight_function = MODEL_WEIGHTS[weight_name]
 
     def compute_weight(row):
-        tree = trees[row["Tree type"]][row["TLS version"]]
+        tree = row["Tree"]
         model = row["Model"]
         return weight_function(tree.model_mapping[model])
 
     weights = df.apply(compute_weight, axis=1)
-
-    # Reformat the TLS version column for the plot
-    df["TLS version"] = df["TLS version"].apply(util.format_tls_string)
 
     # To simulate that models with a higher weight occur more often, we
     # multiply the "results" list with the weight to increase the length.
@@ -265,28 +262,34 @@ def visualize_weight_function(df, output_directory, weight_name):
         pyplot.savefig(output_path.with_suffix(".pdf"))
         pyplot.close()
 
-        # Group the data by TLS version and Method, and create a summary for
-        # the metric.
-        grouped_df = df.groupby(["TLS version", "Method"])
-        summary = grouped_df[column].describe().round(rounding)
+        markdown = ""
+        # Create a markdown table for each TLS version
+        grouped_by_tls = df.groupby("TLS version")
+        for tls_version, tls_group in grouped_by_tls:
+            # Group by method
+            grouped_by_method = tls_group.groupby("Method")
+            summary = grouped_by_method[column].describe().round(rounding)
 
-        # Drop the "count" value. This is the number of rows, which doesn't
-        # carry a lot of meaning in this context as it's mostly the same.
-        summary = summary.drop("count", axis=1)
+            # Drop the "count" value. This is the number of rows, which doesn't
+            # carry a lot of meaning in this context as it's mostly the same.
+            summary = summary.drop("count", axis=1)
 
-        # Reformat the index before we convert to Markdown, otherwise it will
-        # include tuples in the table, which doesn't look good.
-        formatted_index = [" - ".join(x) for x in summary.index]
-        summary.index = formatted_index
+            # # Reformat the index before we convert to Markdown, otherwise it will
+            # # include tuples in the table, which doesn't look good.
+            # formatted_index = [" - ".join(x) for x in summary.index]
+            # summary.index = formatted_index
 
-        # Convert to Markdown
-        markdown = summary.to_markdown()
+            # Convert to Markdown
+            markdown += summary.to_markdown()
 
-        # Add caption to table
-        markdown += "\n\n"
-        markdown += f": Benchmark summary: {title}"
+            # Add caption to table
+            markdown += "\n\n"
+            markdown += f": Benchmark summary: {title} for {tls_version}"
 
-        # Write to output file
+            # Some newline to separate the different tables
+            markdown += "\n\n\n"
+
+        # After generating a table for each TLS version write output to file
         with open(output_path.with_suffix(".md"), "w") as f:
             f.write(markdown)
 
@@ -298,6 +301,14 @@ def visualize_all(benchmark_data, output_directory):
 
     # Convert data to Pandas dataframe
     df = pandas.DataFrame(benchmark_data)
+
+    # Include a reference to the original tree
+    df["Tree"] = df.apply(
+        lambda row: trees[row["Tree type"]][row["TLS version"]], axis=1
+    )
+
+    # Format the TLS version for prettier visualizations
+    df["TLS version"] = df["TLS version"].apply(util.format_tls_string)
 
     for weight_function in MODEL_WEIGHTS.keys():
         visualize_weight_function(df, output_directory, weight_function)
