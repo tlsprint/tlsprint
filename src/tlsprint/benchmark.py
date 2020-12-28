@@ -294,6 +294,53 @@ def visualize_weight_function(df, output_directory, weight_name):
             f.write(markdown)
 
 
+def visualize_tls_models(df, output_directory, tls_version):
+    """Create visualizations to show the (average) metric values for each
+    model, for the given TLS version."""
+    # Start by creating a copy of the DataFrame, to prevent modifications to
+    # the original
+    df = df.copy()
+
+    # Only keep the rows with the correct TLS version
+    df = df[df["TLS version"] == tls_version]
+
+    # Explode the results and extract the metrics to separate columns
+    metric_mapping = [
+        ("inputs", "Number of inputs"),
+        ("resets", "Number of resets"),
+        ("time", "Time in seconds"),
+    ]
+
+    df = df.explode("Results")
+
+    for field, column in metric_mapping:
+        df[column] = df["Results"].apply(operator.itemgetter(field))
+
+    # Compute the mean of the metrics for every method for every model
+    grouped = df.groupby(["Model", "Method"])
+    metric_averages = grouped.mean()
+
+    # For each metric, create a table with Model as rows and Method as columns
+    for field, column in metric_mapping:
+        results = metric_averages[column].unstack()
+
+        # Sort the models by number
+        results = results.sort_index(
+            key=lambda index: [int(name.split("-")[-1]) for name in index]
+        )
+
+        # Convert to Markdown
+        markdown = results.to_markdown()
+
+        # Add caption to table
+        markdown += "\n\n"
+        markdown += f": {column} average for each model of {tls_version}"
+
+        # Write to output file
+        with open(output_directory / f"{tls_version} {field}.md", "w") as f:
+            f.write(markdown)
+
+
 def visualize_all(benchmark_data, output_directory):
     # Make sure the output directory exists
     output_directory = pathlib.Path(output_directory)
@@ -312,3 +359,7 @@ def visualize_all(benchmark_data, output_directory):
 
     for weight_function in MODEL_WEIGHTS.keys():
         visualize_weight_function(df, output_directory, weight_function)
+
+    # Visualize metrics per model
+    for tls_version in df["TLS version"].unique():
+        visualize_tls_models(df, output_directory, tls_version)
