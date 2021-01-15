@@ -175,11 +175,10 @@ def generate_benchmark_inputs(iterations):
 
     # Convert the dataframe to a list, as this is easier to distribute over
     # multiple processes.
-
     return df.to_dict(orient="records")
 
 
-def benchmark_all(iterations=100):
+def benchmark_all(iterations):
     benchmark_inputs = generate_benchmark_inputs(iterations)
 
     # Apply the benchmark function to the inputs and show a progress bar.

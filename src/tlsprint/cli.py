@@ -209,8 +209,11 @@ def benchmark_group():
 
 @benchmark_group.command("generate")
 @click.argument("output", type=click.File("w"))
-def benchmark_generate_command(output):
-    results = benchmark_all()
+@click.option(
+    "--iterations", default=100, help="Number of iterations to perform each benchmark"
+)
+def benchmark_generate_command(output, iterations):
+    results = benchmark_all(iterations)
     json.dump(results, output, indent=4)
 
 
